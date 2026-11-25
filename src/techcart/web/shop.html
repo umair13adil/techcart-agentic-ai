@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechCart · Laptops, PCs & Accessories</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--line:#e3e6eb;--text:#151a21;--muted:#667085;--accent:#2563eb;--accent2:#eef3ff;--good:#16a34a;--bad:#dc2626;--warn:#b45309}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{background:#0f172a;color:#fff;padding:12px 24px;display:flex;align-items:center;gap:18px;position:sticky;top:0;z-index:10}
+  .logo{font-weight:700;font-size:20px;letter-spacing:-.02em}.logo span{color:#60a5fa}
+  .search{flex:1;display:flex;max-width:720px}.search input{flex:1;border:0;border-radius:8px 0 0 8px;padding:11px 14px;font:inherit;font-size:15px}
+  .search button{border:0;background:#3b82f6;color:#fff;padding:0 18px;border-radius:0 8px 8px 0;font:inherit;cursor:pointer}
+  select{font:inherit;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#fff;padding:8px}
+  .cartbtn{background:none;border:1px solid #334155;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit}
+  .cartbtn b{background:#3b82f6;border-radius:999px;padding:0 7px;margin-left:6px}
+  header a{color:#94a3b8;text-decoration:none;font-size:13px}
+  main{max-width:1280px;margin:0 auto;padding:20px 24px 120px}
+  @media (min-width:1200px){main{margin:0 430px 0 0;max-width:none}body.chat-closed main{margin:0 auto;max-width:1280px}}
+  .understood{display:none;background:var(--accent2);border:1px solid #c7d7fe;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+  .understood .chip{display:inline-block;background:#fff;border:1px solid #c7d7fe;border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0}
+  h2{font-size:18px;margin:22px 0 4px} .sub{color:var(--muted);margin:0 0 12px;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .p{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;transition:box-shadow .15s}
+  .p:hover{box-shadow:0 6px 22px rgba(16,24,40,.08)}
+  .p .cat{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .p .img{height:96px;border-radius:8px;background:linear-gradient(135deg,#e0e7ff,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:34px}
+  .p .t{font-weight:600;font-size:13.5px;min-height:38px} .p .price{font-size:17px;font-weight:700}
+  .p .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .p .reason{font-size:12px;color:var(--accent);background:var(--accent2);border-radius:6px;padding:3px 7px}
+  .in{color:var(--good)} .low{color:var(--warn)} .out{color:var(--bad)}
+  .p button{margin-top:auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px;font:inherit;cursor:pointer}
+  .p button:disabled{background:#cbd5e1}
+  .orders{display:flex;gap:10px;flex-wrap:wrap}.order{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+  /* chat */
+  #chat{position:fixed;right:20px;bottom:20px;width:400px;height:600px;max-height:calc(100vh - 100px);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgba(16,24,40,.18);display:flex;flex-direction:column;overflow:hidden;z-index:20}
+  #chat.closed{height:52px}
+  .chead{background:#0f172a;color:#fff;padding:13px 16px;display:flex;align-items:center;gap:8px;cursor:pointer}
+  .chead small{color:#94a3b8;margin-left:auto}
+  .msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#fafbfc}
+  .m{max-width:88%;padding:9px 12px;border-radius:12px;white-space:pre-wrap;font-size:13.5px}
+  .m.u{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .m.a{align-self:flex-start;background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+  .mini{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;align-self:stretch}
+  .mini .p{min-width:170px;padding:9px;font-size:12px}.mini .p .t{min-height:0;font-size:12px}.mini .p .price{font-size:14px}
+  .confirm{align-self:stretch;border:1px solid #fcd34d;background:#fffbeb;border-radius:12px;padding:12px;font-size:13px}
+  .confirm .row{display:flex;gap:8px;margin-top:8px}.confirm input{flex:1;border:1px solid var(--line);border-radius:8px;padding:7px}
+  .confirm button{border:0;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit}.ok{background:var(--good);color:#fff}.no{background:#e5e7eb}
+  .trace{font-size:11px;color:var(--muted);align-self:flex-start;cursor:pointer}
+  .trace pre{white-space:pre-wrap;background:#f1f5f9;border-radius:6px;padding:6px;margin:4px 0 0;display:none;max-width:340px}
+  .cin{display:flex;border-top:1px solid var(--line)}.cin input{flex:1;border:0;padding:14px;font:inherit;outline:none}
+  .cin button{border:0;background:none;color:var(--accent);padding:0 16px;font:inherit;font-weight:600;cursor:pointer}
+  .sugg{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px;background:#fafbfc}.sugg span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;background:#fff}
+  #cartPanel{position:fixed;top:64px;right:20px;width:360px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(16,24,40,.15);padding:14px;display:none;z-index:30;font-size:13px}
+  #cartPanel table{width:100%;border-collapse:collapse}#cartPanel td{padding:5px 0;border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Tech<span>Cart</span></div>
+  <form class="search" id="searchForm"><input id="q" placeholder="Try: gaming laptop under 6000 SAR with 16GB RAM · 4k monitor for my macbook · silent mouse" autocomplete="off"><button>Search</button></form>
+  <select id="who"><option value="">Guest</option></select>
+  <button class="cartbtn" id="cartBtn">Cart<b id="cartCount">0</b></button>
+  <a href="/admin">Admin →</a>
+</header>
+
+<div id="cartPanel"></div>
+
+<main>
+  <div class="understood" id="understood"></div>
+  <section id="resultsSec" style="display:none"><h2 id="resultsTitle">Results</h2><p class="sub" id="resultsSub"></p><div class="grid" id="results"></div></section>
+  <section id="ordersSec" style="display:none"><h2>Your recent orders</h2><div class="orders" id="orders"></div></section>
+  <section><h2 id="recTitle">Recommended for you</h2><p class="sub" id="recSub"></p><div class="grid" id="recs"></div></section>
+  <section><h2>Trending this fortnight</h2><p class="sub">Best sellers across TechCart</p><div class="grid" id="trending"></div></section>
+</main>
+
+<div id="chat">
+  <div class="chead" id="chead">💬 <b>TechCart Assistant</b><small id="agentMode">AI agent</small></div>
+  <div class="msgs" id="msgs"></div>
+  <div class="sugg" id="sugg">
+    <span>Gaming laptop under 6000 SAR</span><span>Compare MacBook Air vs Zenbook 14</span><span>What goes with my laptop?</span>
+    <span>Can I pay with Tabby?</span><span>Where is my order?</span><span>Quote for 25 ThinkPads</span>
+  </div>
+  <form class="cin" id="chatForm"><input id="chatIn" placeholder="Ask, search, or say “add the first one”…" autocomplete="off"><button>Send</button></form>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = (p, o) => fetch(p, o).then(async r => { if (!r.ok) throw new Error((await r.json()).detail || r.statusText); return r.json(); });
+const post = (p, b) => api(p, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(b)});
+const sar = v => Math.round(v).toLocaleString() + " SAR";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[(\d+)\]/g, '<sup style="color:#2563eb">[$1]</sup>');
+const ICON = {"Laptops": "💻", "Desktops": "🖥️", "Monitors": "🖥", "Keyboards": "⌨️", "Mice": "🖱️", "Headsets": "🎧", "Webcams": "📷",
+  "Docks & Hubs": "🔌", "Storage": "💾", "Memory": "🧠", "Graphics Cards": "🎮", "Networking": "📶", "Bags & Sleeves": "🎒",
+  "Chargers & Power": "🔋", "Cooling Pads": "❄️"};
+let SID = localStorage.getItem("tc_sid"), CID = "";
+
+function card(p, opts = {}) {
+  const cls = !p.in_stock ? "out" : p.stock < 5 ? "low" : "in";
+  return `<div class="p"><div class="img">${ICON[p.category] || "📦"}</div><div class="cat">${esc(p.category)} · ${esc(p.brand)}</div>
+    <div class="t">${esc(p.title)}</div>${p.reason ? `<div class="reason">${esc(p.reason)}</div>` : ""}
+    <div class="price">${sar(p.price)}</div><div class="meta"><span>★ ${p.rating} (${p.rating_count})</span><span class="${cls}">${esc(p.stock_label)}</span></div>
+    ${opts.noBtn ? "" : `<button ${p.in_stock ? "" : "disabled"} onclick="addToCart('${p.product_id}')">Add to cart</button>`}</div>`;
+}
+
+async function ensureSession() { if (!SID) { SID = (await api("/api/session")).session_id; localStorage.setItem("tc_sid", SID); } }
+
+async function loadHome() {
+  const h = await api(`/api/home?session_id=${SID}` + (CID ? `&customer_id=${CID}` : ""));
+  $("#recs").innerHTML = h.recommendations.map(p => card(p)).join("");
+  $("#trending").innerHTML = h.trending.map(p => card(p)).join("");
+  $("#recTitle").textContent = h.personalised ? `Picked for you, ${h.customer.name.split(" ")[0]}` : "Popular right now";
+  $("#recSub").textContent = h.personalised ? "Next-purchase recommendations from your order history (hybrid co-purchase + sequence model)"
+    : CID ? "Personalisation is off for this account (no consent) - showing trending items" : "Sign in to get personalised recommendations";
+  $("#ordersSec").style.display = h.recent_orders.length ? "" : "none";
+  $("#orders").innerHTML = h.recent_orders.map(o => `<div class="order"><b>${o.order_id}</b> · ${o.created_at.slice(0, 10)} · ${sar(o.total)} · ${o.status}</div>`).join("");
+  refreshCart();
+}
+
+async function doSearch(q) {
+  const r = await api(`/api/search?q=${encodeURIComponent(q)}&session_id=${SID}`);
+  const u = r.understanding;
+  const chips = r.matched_on.map(m => `<span class="chip">${esc(m)}</span>`).join("");
+  $("#understood").style.display = "block";
+  $("#understood").innerHTML = `Understood as <b>${u.intent.replace("_", " ")}</b> (${(u.confidence * 100).toFixed(0)}% · ${u.tier}) ${chips}` +
+    (r.relaxed.length ? `<div style="margin-top:6px;color:#b45309">No exact match - relaxed: ${r.relaxed.join(", ")}</div>` : "") +
+    (["order_status", "return_refund", "policy_question", "purchase", "quote_request"].includes(u.intent) ? `<div style="margin-top:6px">This looks like a question for the assistant → <a href="#" onclick="openChatWith(${JSON.stringify(q).replace(/"/g, "&quot;")});return false">ask it</a></div>` : "");
+  $("#resultsSec").style.display = "";
+  $("#resultsTitle").textContent = `Results for “${q}”`;
+  $("#resultsSub").textContent = `${r.results.length} products · hybrid retrieval (BM25 + vectors) with filters from the parsed query`;
+  $("#results").innerHTML = r.results.map(p => card(p)).join("") || "<p class=sub>No products found.</p>";
+}
+
+async function addToCart(pid) {
+  try { await post("/api/cart/add", {session_id: SID, product_id: pid, qty: 1}); refreshCart(true); }
+  catch (e) { alert(e.message); }
+}
+async function refreshCart(show) {
+  const c = await api(`/api/cart/${SID}`);
+  $("#cartCount").textContent = c.lines.reduce((a, l) => a + l.qty, 0);
+  $("#cartPanel").innerHTML = `<b>Your cart</b><table>${c.lines.map(l => `<tr><td>${l.qty}× ${esc(l.title)}</td><td style="text-align:right">${sar(l.line_total)}</td></tr>`).join("") || "<tr><td>Empty</td></tr>"}</table>
+    <p>Shipping: ${c.shipping ? sar(c.shipping) : "Free"} · <b>Total ${sar(c.total)}</b> <span style="color:#667085">(incl. VAT ${sar(c.vat_included)})</span></p>
+    ${c.lines.length ? `<button onclick="openChatWith('Checkout with mada')" style="width:100%;border:0;background:#2563eb;color:#fff;border-radius:8px;padding:9px;cursor:pointer">Checkout with the assistant</button>` : ""}`;
+  if (show) { $("#cartPanel").style.display = "block"; setTimeout(() => $("#cartPanel").style.display = "none", 2500); }
+}
+
+// ---------------- chat
+function bubble(text, who) { const d = document.createElement("div"); d.className = "m " + who; d.innerHTML = who === "a" ? md(text) : esc(text); $("#msgs").appendChild(d); scroll(); }
+function scroll() { $("#msgs").scrollTop = 1e9; }
+function trace(r) {
+  const t = document.createElement("div"); t.className = "trace";
+  const info = {agent: r.agent, intent: r.intent, route: r.route, steps: r.trace, citations: (r.citations || []).map(c => c.title)};
+  t.innerHTML = `▸ under the hood<pre>${esc(JSON.stringify(info, null, 1))}</pre>`;
+  t.onclick = () => { const p = t.querySelector("pre"); p.style.display = p.style.display === "block" ? "none" : "block"; };
+  $("#msgs").appendChild(t);
+}
+function confirmCard(p) {
+  const d = document.createElement("div"); d.className = "confirm";
+  d.innerHTML = `<b>Confirm your order</b><br>${p.lines.map(l => `${l.qty}× ${esc(l.title)}`).join("<br>")}
+    <br>Delivery: ${esc(p.city)} · ${esc(p.shipping.carrier)} (${p.shipping.fee ? sar(p.shipping.fee) : "free"}, ~${p.shipping.eta_days} day)
+    <br><b>Total ${sar(p.total)}</b> via ${p.payment_method.replace("_", " ")} (VAT ${sar(p.vat_included)})
+    <div class="row">${p.needs_otp ? `<input placeholder="Bank OTP (any 6 digits in demo)" class="otp">` : ""}<button class="ok">Confirm & pay</button><button class="no">Cancel</button></div>`;
+  d.querySelector(".ok").onclick = () => confirmOrder(true, d.querySelector(".otp")?.value, d);
+  d.querySelector(".no").onclick = () => confirmOrder(false, null, d);
+  $("#msgs").appendChild(d); scroll();
+}
+async function confirmOrder(ok, otp, node) {
+  node.querySelectorAll("button").forEach(b => b.disabled = true);
+  const r = await post("/api/chat/confirm", {session_id: SID, customer_id: CID || null, approved: ok, otp: otp || null});
+  bubble(r.reply, "a");
+  if (r.pending) confirmCard(r.pending);
+  refreshCart(); if (ok) loadHome();
+}
+async function send(text) {
+  bubble(text, "u");
+  const wait = document.createElement("div"); wait.className = "m a"; wait.textContent = "…"; $("#msgs").appendChild(wait); scroll();
+  try {
+    const r = await post("/api/chat", {session_id: SID, customer_id: CID || null, message: text});
+    wait.remove(); bubble(r.reply || "(no reply)", "a");
+    if (r.products && r.products.length) {
+      const m = document.createElement("div"); m.className = "mini"; m.innerHTML = r.products.slice(0, 6).map(p => card(p)).join(""); $("#msgs").appendChild(m);
+    }
+    if (r.pending) confirmCard(r.pending);
+    trace(r); refreshCart(); scroll();
+  } catch (e) { wait.textContent = "Sorry, something went wrong: " + e.message; }
+}
+function openChatWith(t) { $("#chat").classList.remove("closed"); document.body.classList.remove("chat-closed"); send(t); }
+
+$("#chatForm").onsubmit = e => { e.preventDefault(); const t = $("#chatIn").value.trim(); if (t) { $("#chatIn").value = ""; send(t); } };
+$("#sugg").onclick = e => { if (e.target.tagName === "SPAN") send(e.target.textContent); };
+$("#chead").onclick = () => { $("#chat").classList.toggle("closed"); document.body.classList.toggle("chat-closed"); };
+$("#searchForm").onsubmit = e => { e.preventDefault(); const q = $("#q").value.trim(); if (q) doSearch(q); };
+$("#cartBtn").onclick = () => { const p = $("#cartPanel"); p.style.display = p.style.display === "block" ? "none" : "block"; };
+$("#who").onchange = e => { CID = e.target.value; bubble(CID ? `Signed in as ${e.target.selectedOptions[0].text}` : "Browsing as guest", "a"); loadHome(); };
+
+(async () => {
+  await ensureSession();
+  const [demo, sys] = await Promise.all([api("/api/customers/demo"), api("/api/system")]);
+  $("#who").innerHTML += demo.map(c => `<option value="${c.customer_id}">${esc(c.name)} · ${c.segment} · ${c.city}</option>`).join("");
+  $("#agentMode").textContent = sys.agent_mode === "llm" ? "LangGraph · Azure OpenAI" : "rule agent (no LLM key)";
+  bubble("Hi! I can find laptops & accessories, compare models, recommend what goes with your setup, answer warranty/shipping questions, track orders and check you out.", "a");
+  await loadHome();
+  const q0 = new URLSearchParams(location.search).get("q");   // deep link: /?q=gaming+laptop
+  if (q0) { $("#q").value = q0; doSearch(q0); }
+})();
+</script>
+</body>
+</html>

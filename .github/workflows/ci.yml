@@ -1,0 +1,57 @@
+name: ci-ct
+on:
+  push: {branches: [main]}
+  pull_request:
+  schedule: [{cron: "17 2 * * 1"}]   # weekly continuous-training check
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e ".[dev]"
+      - run: ruff check --select E9,F63,F7,F82 src tests scripts   # critical errors only
+      - name: Unit + integration tests (offline: hashing embeddings, rule agent, in-process MCP)
+        run: pytest -q
+      - name: Quality gates (model metrics + RAG retrieval + security leaks)
+        env: {PYTHONPATH: src}
+        run: |
+          python scripts/seed.py --source offline
+          python scripts/train_all.py
+          python scripts/build_index.py --embedder hashing
+          python scripts/eval_rag.py --min-hit 0.85
+
+  continuous-training:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: src
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_TRACING: "true"
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}   # e.g. Azure ML workspace MLflow URI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12", cache: pip}
+      - run: pip install -e ".[dev,mlops]"
+      # In production the data comes from the warehouse; here we regenerate the demo dataset.
+      - run: python scripts/seed.py --source offline && python scripts/simulate_traffic.py || true
+      - name: Drift check (exit 3 => retrain)
+        id: drift
+        run: |
+          set +e; python scripts/train_all.py >/dev/null; python scripts/simulate_traffic.py
+          python scripts/monitor_drift.py; echo "code=$?" >> "$GITHUB_OUTPUT"
+      - name: Retrain with promotion gates
+        if: steps.drift.outputs.code == '3'
+        run: python scripts/train_all.py
+      - name: RAG eval incl. LLM-as-judge in LangSmith
+        if: env.AZURE_OPENAI_ENDPOINT != ''
+        run: python scripts/build_index.py && python scripts/eval_rag.py --langsmith
+      - uses: actions/upload-artifact@v4
+        with: {name: model-registry, path: data/artifacts}

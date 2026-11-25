@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechCart · Admin Intelligence</title>
+<style>
+  :root{--bg:#0e1116;--panel:#161b22;--panel2:#1c222b;--line:#2a313c;--text:#e6edf3;--muted:#8b949e;
+        --accent:#4f8cff;--good:#3fb950;--bad:#f85149;--warn:#d29922;--violet:#a371f7}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(14,17,22,.92);backdrop-filter:blur(6px);z-index:5}
+  header h1{font-size:17px;margin:0;font-weight:650} header h1 span{color:var(--accent)}
+  .pill{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+  .live{color:var(--good)} .live:before{content:"● ";animation:blink 1.4s infinite} @keyframes blink{50%{opacity:.25}}
+  header .sp{flex:1} header a{color:var(--muted);text-decoration:none;font-size:13px}
+  main{padding:18px 22px;display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+  .card h2{font-size:13px;font-weight:600;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+  .card h2 small{text-transform:none;letter-spacing:0;font-weight:400}
+  .kpis{grid-column:span 12;display:grid;grid-template-columns:repeat(7,1fr);gap:14px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi .l{color:var(--muted);font-size:12px} .kpi .v{font-size:22px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+  .kpi .d{font-size:12px;margin-top:2px} .up{color:var(--good)} .down{color:var(--bad)}
+  .s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+  .chart .grid{stroke:var(--line);stroke-width:1}.chart .axis{fill:var(--muted);font-size:11px}.chart .tip{fill:var(--text);font-size:12px}.chart .vline{stroke:var(--muted);stroke-dasharray:3 3}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:4px}.legend i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle}
+  .hbar{display:grid;grid-template-columns:130px 1fr 60px;gap:8px;align-items:center;margin:5px 0;font-size:12.5px}
+  .hbar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+  .hbar-track{background:var(--panel2);border-radius:4px;height:10px;overflow:hidden}.hbar-fill{display:block;height:100%;border-radius:4px}
+  .hbar-val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:12.5px} th{text-align:left;color:var(--muted);font-weight:500;padding:5px 6px;border-bottom:1px solid var(--line)}
+  td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top} td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .feed{max-height:330px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+  .ev{display:grid;grid-template-columns:62px 1fr auto;gap:10px;padding:8px 10px;background:var(--panel2);border-radius:8px;border-left:3px solid var(--accent);animation:in .4s}
+  .ev.risk{border-left-color:var(--bad)} .ev .t{color:var(--muted);font-size:12px}.ev .amt{font-weight:600;font-variant-numeric:tabular-nums}
+  .ev .items{font-size:12px;color:var(--muted)} @keyframes in{from{opacity:0;transform:translateY(-6px)}}
+  .badge{font-size:11px;padding:2px 7px;border-radius:999px;background:var(--panel2);border:1px solid var(--line)}
+  .badge.bad{color:var(--bad);border-color:#5a2a2a}.badge.good{color:var(--good);border-color:#244b2c}.badge.warn{color:var(--warn);border-color:#5a4a1a}
+  .row{display:flex;gap:8px} input,button{font:inherit} input{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px}
+  button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer} button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .answer{margin-top:10px;font-size:13px;white-space:pre-wrap;background:var(--panel2);border-radius:8px;padding:10px;display:none}
+  .cites{margin-top:6px;font-size:12px;color:var(--muted)} .muted{color:var(--muted)} code{font-size:12px;color:var(--violet)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;padding:3px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
+  .scroll{max-height:260px;overflow:auto}
+  @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Tech<span>Cart</span> · Admin Intelligence</h1>
+  <span class="pill live" id="livePill">Live</span>
+  <span class="pill" id="modePill">agent: …</span>
+  <span class="sp"></span>
+  <span class="pill" id="todayPill">Today: –</span>
+  <a href="/">Open storefront →</a>
+</header>
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card s8">
+    <h2>Revenue · last 120 days + 14-day forecast <small class="muted" id="fcNote"></small></h2>
+    <div id="revChart"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Actual (daily)</span><span><i style="background:var(--good)"></i>7-day avg</span><span><i style="background:var(--violet)"></i>Forecast (80% band)</span></div>
+  </section>
+  <section class="card s4">
+    <h2>Live orders <small class="muted">SSE · risk-scored on arrival</small></h2>
+    <div class="feed" id="feed"><div class="muted">Waiting for orders…</div></div>
+  </section>
+
+  <section class="card s4"><h2>Revenue by category · 30d</h2><div id="catBars"></div></section>
+  <section class="card s4"><h2>Top products · 30d</h2><div class="scroll"><table id="topTbl"></table></div></section>
+  <section class="card s4">
+    <h2>Low stock <small class="muted">via ERP MCP server</small></h2>
+    <div class="scroll"><table id="stockTbl"></table></div>
+  </section>
+
+  <section class="card s6">
+    <h2>Fraud review queue <small class="muted">IsolationForest · top 1% risk</small></h2>
+    <div class="scroll"><table id="riskTbl"></table></div>
+  </section>
+  <section class="card s6">
+    <h2>Search &amp; assistant insights · 7d</h2>
+    <div class="row" style="gap:18px;margin-bottom:8px" id="searchStats"></div>
+    <div id="intentBars"></div>
+    <div style="margin-top:10px" class="muted">Low-confidence queries (active-learning queue):</div>
+    <div class="chips" id="lowConf" style="margin-top:6px"></div>
+  </section>
+
+  <section class="card s5">
+    <h2>Ops copilot <small class="muted">RAG over POs, quotations &amp; policies (staff scope)</small></h2>
+    <div class="row"><input id="askIn" placeholder="e.g. What is the status and total of quotation QT-C-0041?"><button id="askBtn">Ask</button></div>
+    <div class="answer" id="askOut"></div>
+  </section>
+  <section class="card s4">
+    <h2>Drift monitor <small class="muted">PSI</small></h2>
+    <div id="drift"></div>
+  </section>
+  <section class="card s3" style="grid-column:span 3">
+    <h2>Model registry</h2>
+    <div id="models" style="font-size:12.5px"></div>
+  </section>
+
+  <section class="card s7">
+    <h2>Agent audit trail <small class="muted">PII-redacted</small></h2>
+    <div class="scroll"><table id="auditTbl"></table></div>
+  </section>
+  <section class="card s5">
+    <h2>Connected systems <small class="muted">MCP tools available to agents</small></h2>
+    <div class="scroll"><table id="mcpTbl"></table></div>
+  </section>
+</main>
+<script src="/web/charts.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const sar = v => Math.round(v).toLocaleString() + " SAR";
+const api = (p, o) => fetch(p, o).then(r => r.json());
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let todayRevenue = 0, todayOrders = 0;
+
+async function loadKpis() {
+  const k = await api("/api/admin/kpis?days=30");
+  const d = v => v == null ? "" : `<div class="d ${v >= 0 ? "up" : "down"}">${v >= 0 ? "▲" : "▼"} ${Math.abs(v)}% vs prev 30d</div>`;
+  const tiles = [["Revenue (30d)", (k.revenue / 1e6).toFixed(2) + "M SAR", d(k.revenue_delta_pct)], ["Orders", k.orders.toLocaleString(), d(k.orders_delta_pct)],
+    ["Avg order value", sar(k.aov), d(k.aov_delta_pct)], ["Gross margin", k.gross_margin_pct + "%", '<div class="d muted">ex-VAT</div>'],
+    ["Return rate", k.return_rate_pct + "%", '<div class="d muted">of orders</div>'], ["Via AI assistant", k.assistant_share_pct + "%", '<div class="d muted">of orders</div>'],
+    ["Fraud alerts", k.risky_orders, '<div class="d muted">top-1% risk, 30d</div>']];
+  $("#kpis").innerHTML = tiles.map(([l, v, x]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${x}</div>`).join("");
+}
+
+async function loadRevenue() {
+  const t = await api("/api/admin/timeseries?days=120");
+  const pts = t.history.map(r => ({x: new Date(r.d), y: r.revenue}));
+  const ma = pts.map((p, i) => ({x: p.x, y: pts.slice(Math.max(0, i - 6), i + 1).reduce((a, b) => a + b.y, 0) / Math.min(i + 1, 7)}));
+  const fc = t.forecast.map(f => ({x: new Date(f.date), y: f.yhat}));
+  const band = t.forecast.map(f => ({x: new Date(f.date), lo: f.lo, hi: f.hi}));
+  lineChart($("#revChart"), [
+    {name: "Actual", color: "#4f8cff", points: pts, width: 1.2},
+    {name: "7-day avg", color: "#3fb950", points: ma, width: 2.2},
+    {name: "Forecast", color: "#a371f7", points: fc, dashed: true, band, width: 2}], {height: 250});
+  if (t.forecast.length) {
+    const next7 = t.forecast.slice(0, 7).reduce((a, b) => a + b.yhat, 0);
+    $("#fcNote").textContent = `next 7 days ≈ ${sar(next7)}`;
+  }
+  const today = new Date().toISOString().slice(0, 10), tr = t.history.find(r => r.d === today);
+  if (tr) { todayRevenue = tr.revenue; todayOrders = tr.orders; } updateToday();
+}
+function updateToday() { $("#todayPill").textContent = `Today: ${sar(todayRevenue)} · ${todayOrders} orders`; }
+
+async function loadTables() {
+  const [cats, top, stock, risky, si, audit, sys, drift] = await Promise.all([
+    api("/api/admin/categories"), api("/api/admin/top-products"), api("/api/admin/low-stock"), api("/api/admin/risky-orders"),
+    api("/api/admin/search-insights"), api("/api/admin/audit"), api("/api/system"), api("/api/admin/drift")]);
+  hbar($("#catBars"), cats.map(c => ({label: c.category, value: c.revenue})));
+  $("#topTbl").innerHTML = "<tr><th>Product</th><th class=n>Units</th><th class=n>Revenue</th></tr>" +
+    top.map(p => `<tr><td>${esc(p.title.split(" - ")[0])}</td><td class=n>${p.units}</td><td class=n>${Math.round(p.revenue).toLocaleString()}</td></tr>`).join("");
+  $("#stockTbl").innerHTML = "<tr><th>Item</th><th class=n>Avail</th><th class=n>ROP</th><th class=n>Reorder</th></tr>" +
+    (Array.isArray(stock) ? stock : []).map(s => `<tr><td>${esc(s.title.split(" - ")[0])}</td><td class=n>${s.available <= 0 ? '<span class="badge bad">0</span>' : s.available}</td><td class=n>${s.reorder_point}</td><td class=n>${s.suggested_qty}</td></tr>`).join("");
+  $("#riskTbl").innerHTML = "<tr><th>Order</th><th>When</th><th class=n>Total</th><th>Pay</th><th>Ship / profile city</th><th>Customer since</th><th class=n>Risk</th></tr>" +
+    risky.map(r => `<tr><td><code>${r.order_id}</code></td><td>${r.created_at.replace("T", " ").slice(5, 16)}</td><td class=n>${Math.round(r.total).toLocaleString()}</td><td>${r.payment_method}</td><td>${r.ship_city}${r.ship_city !== r.profile_city ? ' <span class="badge warn">≠ ' + r.profile_city + "</span>" : ""}</td><td>${r.customer_since}</td><td class=n><span class="badge bad">${(r.risk_score * 100).toFixed(1)}</span></td></tr>`).join("");
+  $("#searchStats").innerHTML = `<div><div class="muted">Queries</div><b>${si.queries.toLocaleString()}</b></div><div><div class="muted">Avg confidence</div><b>${(si.avg_confidence * 100).toFixed(1)}%</b></div><div><div class="muted">LLM fallback</div><b>${(si.llm_fallback_rate * 100).toFixed(1)}%</b></div>`;
+  hbar($("#intentBars"), si.intents.map(i => ({label: i.intent.replace("_", " "), value: i.n})), {color: "var(--violet)", fmt: v => v});
+  $("#lowConf").innerHTML = si.needs_labeling.map(q => `<span class="chip" title="${q.intent} @ ${q.confidence}">${esc(q.query)}${q.n > 1 ? ` <span class="muted">×${q.n}</span>` : ""}</span>`).join("") || '<span class="muted">none</span>';
+  $("#auditTbl").innerHTML = "<tr><th>Time</th><th>Actor</th><th>Action</th><th>Payload</th></tr>" +
+    audit.map(a => `<tr><td>${a.ts.slice(5, 16).replace("T", " ")}</td><td>${a.actor}</td><td>${a.action}</td><td class="muted">${esc(a.payload).slice(0, 90)}</td></tr>`).join("") || "<tr><td class=muted>No agent actions yet - try the storefront assistant.</td></tr>";
+  $("#mcpTbl").innerHTML = "<tr><th>Server</th><th>Tool</th><th>Purpose</th></tr>" +
+    sys.mcp_tools.map(t => `<tr><td><span class="badge">${t.server}</span></td><td><code>${t.tool}</code></td><td class="muted">${esc(t.description).slice(0, 70)}</td></tr>`).join("");
+  $("#modePill").textContent = `agent: ${sys.agent_mode} · mcp: ${sys.mcp_mode}`;
+  $("#models").innerHTML = Object.entries(sys.models).map(([n, m]) => {
+    const key = Object.entries(m.metrics).filter(([k, v]) => typeof v === "number" && /f1|ndcg@10|roc_auc|weekly_wape_model|accuracy_when/.test(k) && !/cobasket|popular/.test(k)).slice(0, 2);
+    return `<div style="margin-bottom:8px"><b>${n}</b> <span class="badge good">prod v${m.production ?? "-"}</span> <span class="muted">latest v${m.latest}</span><div class="muted">${key.map(([k, v]) => `${k}: ${v}`).join(" · ")}</div></div>`;
+  }).join("");
+  const sigs = drift.signals || {};
+  $("#drift").innerHTML = Object.entries(sigs).map(([k, v]) => v.psi !== undefined ?
+      `<div class="hbar" style="grid-template-columns:150px 1fr 90px"><span>${k.replace(/_/g, " ")}</span><span class="hbar-track"><span class="hbar-fill" style="width:${Math.min(100, v.psi / 0.4 * 100)}%;background:${v.status === "stable" ? "var(--good)" : v.status === "moderate" ? "var(--warn)" : "var(--bad)"}"></span></span><span class="badge ${v.status === "stable" ? "good" : v.status === "moderate" ? "warn" : "bad"}">${v.psi}</span></div>`
+      : `<div class="muted" style="font-size:12px">LLM fallback: ${(v.ref * 100).toFixed(1)}% → ${(v.cur * 100).toFixed(1)}%</div>`).join("") +
+    `<div style="margin-top:8px">${drift.retrain_recommended ? '<span class="badge bad">Retraining recommended</span>' : '<span class="badge good">No action needed</span>'}</div>`;
+}
+
+function addEvent(ev) {
+  const feed = $("#feed");
+  if (feed.firstElementChild && feed.firstElementChild.classList.contains("muted")) feed.innerHTML = "";
+  const risky = ev.risk >= 0.99;
+  const div = document.createElement("div");
+  div.className = "ev" + (risky ? " risk" : "");
+  div.innerHTML = `<div class="t">${ev.ts.slice(11, 19)}<br>${ev.channel}</div>
+    <div><div class="amt">${sar(ev.total)} <span class="muted" style="font-weight:400">· ${ev.city}</span></div>
+    <div class="items">${ev.items.map(i => `${i.qty}× ${esc(i.title)}`).join("<br>")}</div>
+    ${risky ? `<div class="items" style="color:var(--bad)">⚠ ${ev.risk_reasons.join(", ") || "anomalous pattern"}</div>` : ""}</div>
+    <div><span class="badge ${risky ? "bad" : ev.risk > 0.9 ? "warn" : "good"}">risk ${(ev.risk * 100).toFixed(0)}</span></div>`;
+  feed.prepend(div);
+  while (feed.children.length > 40) feed.lastChild.remove();
+  todayRevenue += ev.total; todayOrders += 1; updateToday();
+}
+
+function connect() {
+  const es = new EventSource("/api/admin/stream");
+  es.onmessage = m => { const ev = JSON.parse(m.data); if (ev.type === "order") { addEvent(ev); if (ev.risk >= 0.99) loadKpis(); } };
+  es.onopen = () => { $("#livePill").className = "pill live"; $("#livePill").textContent = "Live"; };
+  es.onerror = () => { $("#livePill").className = "pill"; $("#livePill").textContent = "Reconnecting…"; };
+}
+
+$("#askBtn").onclick = async () => {
+  const q = $("#askIn").value.trim(); if (!q) return;
+  const out = $("#askOut"); out.style.display = "block"; out.textContent = "Thinking…";
+  const r = await api("/api/admin/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q})});
+  out.innerHTML = esc(r.answer) + `<div class="cites">${r.citations.map(c => `[${c.n}] ${esc(c.title)}`).join(" · ")}</div>`;
+};
+$("#askIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#askBtn").click(); });
+
+loadKpis(); loadRevenue(); loadTables();
+if (!location.search.includes("nolive")) connect();  // ?nolive for static screenshots
+setInterval(loadTables, 30000); setInterval(loadKpis, 60000);
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# API + three MCP servers as separate services (MCP over streamable HTTP), sharing one data volume.
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: [.env]
+    environment:
+      MCP_MODE: http
+      MCP_INVENTORY_URL: http://mcp-erp:8101/mcp
+      MCP_PAYMENTS_URL: http://mcp-payments:8102/mcp
+      MCP_SHIPPING_URL: http://mcp-shipping:8103/mcp
+    volumes: [data:/data]
+    depends_on: [mcp-erp, mcp-payments, mcp-shipping]
+
+  mcp-erp:
+    build: .
+    command: ["sh", "-c", "until [ -f /data/techcart.db ]; do sleep 2; done; python -m techcart.mcp_servers.inventory_erp --http --host 0.0.0.0 --port 8101"]
+    environment: {MCP_ALLOWED_HOSTS: "mcp-erp:8101"}
+    volumes: [data:/data]
+
+  mcp-payments:
+    build: .
+    command: ["python", "-m", "techcart.mcp_servers.payments", "--http", "--host", "0.0.0.0", "--port", "8102"]
+    environment: {MCP_ALLOWED_HOSTS: "mcp-payments:8102"}
+
+  mcp-shipping:
+    build: .
+    command: ["python", "-m", "techcart.mcp_servers.shipping", "--http", "--host", "0.0.0.0", "--port", "8103"]
+    environment: {MCP_ALLOWED_HOSTS: "mcp-shipping:8103"}
+
+volumes:
+  data:

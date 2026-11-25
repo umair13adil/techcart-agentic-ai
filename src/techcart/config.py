@@ -1,0 +1,71 @@
+"""Central settings. Reads environment variables (and a local .env if present)."""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        v = v.split(" #")[0].strip()
+        os.environ.setdefault(k.strip(), v)
+
+
+_load_dotenv(ROOT / ".env")
+
+
+def _env(name: str, default: str = "") -> str:
+    return os.environ.get(name, default)
+
+
+@dataclass(frozen=True)
+class Settings:
+    data_dir: Path = field(default_factory=lambda: Path(_env("TECHCART_DATA_DIR", str(ROOT / "data"))).resolve())
+    currency: str = field(default_factory=lambda: _env("CURRENCY", "SAR"))
+    agent_mode: str = field(default_factory=lambda: _env("AGENT_MODE", "llm"))
+    mcp_mode: str = field(default_factory=lambda: _env("MCP_MODE", "inproc"))
+    vector_backend: str = field(default_factory=lambda: _env("VECTOR_BACKEND", "local"))
+
+    aoai_endpoint: str = field(default_factory=lambda: _env("AZURE_OPENAI_ENDPOINT"))
+    aoai_key: str = field(default_factory=lambda: _env("AZURE_OPENAI_API_KEY"))
+    aoai_api_version: str = field(default_factory=lambda: _env("AZURE_OPENAI_API_VERSION", "2024-10-21"))
+    aoai_chat_deployment: str = field(default_factory=lambda: _env("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini"))
+    aoai_embed_deployment: str = field(
+        default_factory=lambda: _env("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-small")
+    )
+
+    mcp_urls: dict = field(
+        default_factory=lambda: {
+            "inventory": _env("MCP_INVENTORY_URL", "http://localhost:8101/mcp"),
+            "payments": _env("MCP_PAYMENTS_URL", "http://localhost:8102/mcp"),
+            "shipping": _env("MCP_SHIPPING_URL", "http://localhost:8103/mcp"),
+        }
+    )
+
+    @property
+    def db_path(self) -> Path:
+        return self.data_dir / "techcart.db"
+
+    @property
+    def docs_dir(self) -> Path:
+        return self.data_dir / "docs"
+
+    @property
+    def artifacts_dir(self) -> Path:
+        return self.data_dir / "artifacts"
+
+    @property
+    def llm_enabled(self) -> bool:
+        return bool(self.aoai_endpoint and self.aoai_key)
+
+
+settings = Settings()
