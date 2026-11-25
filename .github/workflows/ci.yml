@@ -13,13 +13,16 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
       - run: pip install -e ".[dev]"
+      - name: Cache Hugging Face catalog
+        uses: actions/cache@v4
+        with: {path: .cache, key: hf-catalog-v1}
       - run: ruff check --select E9,F63,F7,F82 src tests scripts   # critical errors only
-      - name: Unit + integration tests (offline: hashing embeddings, rule agent, in-process MCP)
+      - name: Unit + integration tests (HF catalog, hashing embeddings, rule agent, in-process MCP)
         run: pytest -q
       - name: Quality gates (model metrics + RAG retrieval + security leaks)
         env: {PYTHONPATH: src}
         run: |
-          python scripts/seed.py --source offline
+          python scripts/seed.py
           python scripts/train_all.py
           python scripts/build_index.py --embedder hashing
           python scripts/eval_rag.py --min-hit 0.85
@@ -40,8 +43,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12", cache: pip}
       - run: pip install -e ".[dev,mlops]"
+      - uses: actions/cache@v4
+        with: {path: .cache, key: hf-catalog-v1}
       # In production the data comes from the warehouse; here we regenerate the demo dataset.
-      - run: python scripts/seed.py --source offline && python scripts/simulate_traffic.py || true
+      - run: python scripts/seed.py && python scripts/simulate_traffic.py || true
       - name: Drift check (exit 3 => retrain)
         id: drift
         run: |

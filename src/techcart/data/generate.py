@@ -247,7 +247,8 @@ class Generator:
             self.customers.append(cust)
         else:  # account takeover of an existing customer
             cust = base if base["created_at"] <= d.isoformat() else self.customers[0]
-        cat = rng.choice(["Graphics Cards", "Laptops", "Laptops", "Monitors"])
+        cat = rng.choice([c for c in ["Graphics Cards", "Laptops", "Laptops", "Monitors"] if self.by_cat.get(c)]
+                         or list(self.by_cat))
         expensive = sorted(self.by_cat[cat], key=lambda p: -p["price"])[:8]
         lines = [self._line(rng.choice(expensive), rng.choice([1, 2, 3, 4, 6, 8]))]
         city = rng.choice([c for c, _ in CITIES if c != cust["city"]]) if rng.random() < 0.6 else cust["city"]
@@ -318,16 +319,18 @@ class Generator:
             if i % 2:  # customer quote
                 c = rng.choice(biz)
                 qid = f"QT-C-{i:04d}"
-                laptops = [p for p in self.by_cat["Laptops"] if p["subcategory"] in ("business", "ultrabook")]
+                laptops = [p for p in self.by_cat["Laptops"] if p["subcategory"] in ("business", "ultrabook")] \
+                    or self.by_cat["Laptops"] or self.by_cat["Monitors"] or self.products
                 lap = rng.choice(laptops)
                 qty = rng.choice([10, 12, 15, 20, 25, 30, 40, 50, 60])
                 disc = 0.12 if qty >= 50 else 0.08 if qty >= 25 else 0.05
                 lines = [(lap, qty, round(lap["price"] * (1 - disc), 2))]
-                if rng.random() < 0.7:
+                if rng.random() < 0.7 and self.by_cat["Docks & Hubs"]:
                     dock = rng.choice(self.by_cat["Docks & Hubs"])
                     lines.append((dock, qty, round(dock["price"] * (1 - disc), 2)))
-                if rng.random() < 0.4:
-                    mon = rng.choice([p for p in self.by_cat["Monitors"] if p["subcategory"] == "office"])
+                office = [p for p in self.by_cat["Monitors"] if p["subcategory"] == "office"] or self.by_cat["Monitors"]
+                if rng.random() < 0.4 and office:
+                    mon = rng.choice(office)
                     lines.append((mon, qty, round(mon["price"] * (1 - disc), 2)))
                 age = (self.end - d).days
                 status = "sent" if age <= 14 else _w([("accepted", 0.45), ("expired", 0.4), ("rejected", 0.15)], rng)

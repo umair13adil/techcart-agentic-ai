@@ -12,7 +12,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS products (
   product_id TEXT PRIMARY KEY, sku TEXT, title TEXT, brand TEXT, category TEXT, subcategory TEXT,
   price REAL, cost REAL, rating REAL, rating_count INTEGER, specs_json TEXT, features TEXT,
-  description TEXT, source TEXT
+  description TEXT, source TEXT, image_url TEXT
 );
 CREATE TABLE IF NOT EXISTS inventory (
   product_id TEXT PRIMARY KEY, stock_on_hand INTEGER, reserved INTEGER DEFAULT 0,

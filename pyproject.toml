@@ -28,10 +28,12 @@ dependencies = [
   "openai>=1.40",
   # MCP (v2 SDK: MCPServer + Client)
   "mcp>=2.0",
+  # catalog: streamed from Hugging Face (Amazon-Reviews-2023, raw_meta_Electronics parquet)
+  "datasets>=3.0",
+  "huggingface_hub>=0.23",
 ]
 
 [project.optional-dependencies]
-hf = ["datasets>=2.19", "huggingface_hub>=0.23"]
 mlops = ["mlflow>=2.14"]
 azure = ["azure-search-documents>=11.4", "azure-identity>=1.16"]
 dev = ["pytest>=8", "ruff>=0.5"]

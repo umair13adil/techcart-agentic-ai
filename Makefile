@@ -1,18 +1,18 @@
 PY ?= python
 export PYTHONPATH := src
 
-.PHONY: install bootstrap seed seed-hf train index traffic eval drift test api mcp-http lint docker
+.PHONY: install bootstrap seed seed-refresh train index traffic eval drift test api mcp-http lint docker
 
 install:            ## install runtime + dev deps
 	$(PY) -m pip install -e ".[dev]"
 
-bootstrap: seed train index traffic   ## everything needed for a first run (offline-safe)
+bootstrap: seed train index traffic   ## everything needed for a first run
 
-seed:               ## offline catalog (fast, deterministic)
-	$(PY) scripts/seed.py --source offline
+seed:               ## catalog from Hugging Face (first run streams + caches to .cache/), then synthetic transactions
+	$(PY) scripts/seed.py
 
-seed-hf:            ## real Amazon-Reviews-2023 catalog from Hugging Face (needs: pip install ".[hf]")
-	$(PY) scripts/seed.py --source hf
+seed-refresh:       ## re-download the Hugging Face catalog
+	$(PY) scripts/seed.py --refresh
 
 train:              ## train + evaluate + register + gated promotion
 	$(PY) scripts/train_all.py

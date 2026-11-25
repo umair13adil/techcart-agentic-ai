@@ -1,7 +1,8 @@
-"""Seed the TechCart database + RAG documents.
+"""Seed the TechCart database + RAG documents from the Hugging Face catalog.
 
-    python scripts/seed.py                     # auto: Hugging Face -> UCSD mirror -> offline catalog
-    python scripts/seed.py --source offline    # no network needed
+    python scripts/seed.py              # first run streams Amazon-Reviews-2023 (Electronics) from Hugging Face
+                                        # and caches it to .cache/catalog_hf.jsonl; later runs use the cache
+    python scripts/seed.py --refresh    # re-download the catalog
 """
 from __future__ import annotations
 
@@ -23,7 +24,8 @@ from techcart.db import connect  # noqa: E402
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", default="auto", choices=["auto", "hf", "ucsd", "offline"])
+    ap.add_argument("--refresh", action="store_true", help="ignore the cached catalog and re-stream from HF")
+    ap.add_argument("--scan-limit", type=int, default=1_500_000, help="max HF records to scan")
     ap.add_argument("--days", type=int, default=540)
     ap.add_argument("--customers", type=int, default=3200)
     ap.add_argument("--seed", type=int, default=42)
@@ -31,7 +33,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     t0 = time.time()
-    products = load_catalog(args.source)
+    products = load_catalog(scan_limit=args.scan_limit, refresh=args.refresh)
     gen = Generator(products, seed=args.seed, days=args.days, n_customers=args.customers)
     gen.make_customers()
     gen.make_orders()

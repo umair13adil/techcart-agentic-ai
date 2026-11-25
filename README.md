@@ -11,7 +11,7 @@ An end-to-end, open-source reference system for an online laptop/PC/accessories 
 - **MLOps**: model registry with promotion gates, MLflow/Azure ML tracking hook, PSI drift monitoring, scheduled continuous training in CI, and LangSmith tracing and evals.
 - **Responsible AI and PDPL**: consent-gated personalisation, PII redaction, an audit trail, explainable fraud reasons and model cards.
 
-Stack: **Azure OpenAI (Microsoft Foundry)**, LangGraph, LangSmith, MCP Python SDK v2, FastAPI, scikit-learn, SQLite (swap for Azure SQL/Postgres). Without an Azure key, everything still runs offline: local hashing embeddings, a rule-based agent and in-process MCP. That keeps CI and demos reliable. A component-by-component **Vertex AI mapping** is in [`docs/AZURE_TO_GCP.md`](docs/AZURE_TO_GCP.md).
+Stack: **Azure OpenAI (Microsoft Foundry)**, LangGraph, LangSmith, MCP Python SDK v2, FastAPI, scikit-learn, SQLite (swap for Azure SQL/Postgres). Without an Azure key, everything still runs: local hashing embeddings, a rule-based agent and in-process MCP. That keeps CI and demos reliable. A component-by-component **Vertex AI mapping** is in [`docs/AZURE_TO_GCP.md`](docs/AZURE_TO_GCP.md).
 
 ```mermaid
 flowchart LR
@@ -44,11 +44,11 @@ flowchart LR
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"            # add ".[hf]" for the Hugging Face catalog, ".[mlops]" for MLflow
+pip install -e ".[dev]"            # add ".[mlops]" for MLflow
 cp .env.example .env               # optional: Azure OpenAI + LangSmith keys
-make bootstrap                     # seed data → train/register models → build RAG index → backfill search logs
+make bootstrap                     # HF catalog → synthetic transactions → train/register models → RAG index → search logs
 make api                           # http://localhost:8000 (shop) · /admin · /docs (OpenAPI)
-make test                          # 20 tests, fully offline
+make test                          # 20 tests (no API keys needed)
 ```
 
 With Azure OpenAI configured (`AGENT_MODE=llm`), the assistant runs on the LangGraph graph, `make index` uses `text-embedding-3-small`, and `make eval ARGS=--langsmith` runs LLM-as-judge experiments in LangSmith.
@@ -58,15 +58,14 @@ To run MCP across processes, use `make mcp-http`, then `MCP_MODE=http make api`,
 
 | Source | What | How |
 |---|---|---|
-| Hugging Face [`McAuley-Lab/Amazon-Reviews-2023`](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) (`raw_meta_Electronics`) | Real product titles, features, descriptions, prices and ratings, filtered to *Computers & Accessories* and mapped to 15 store categories | `make seed-hf` (streams; falls back to the UCSD mirror) |
-| Offline catalog | About 150 spec-realistic SKUs (Dell, HP, Lenovo, Apple, ASUS, Logitech and others) with price-tier-consistent CPUs/GPUs | default `make seed` |
+| Hugging Face [`McAuley-Lab/Amazon-Reviews-2023`](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) (`raw_meta_Electronics` Parquet) | The **only** product source: real titles, features, descriptions, prices, ratings and images, filtered to *Computers & Accessories*, mapped leaf-first to 15 store categories, with specs (RAM, SSD, screen, GPU, CPU) parsed from `details` | `make seed` streams the shards until each category quota is filled (up to ~460 products), caches to `.cache/catalog_hf.jsonl`; `make seed-refresh` re-downloads |
 | Synthetic generator (seeded) | 18 months of orders with KSA seasonality (White Friday, Ramadan, back-to-school), personas, complementary baskets, repeat "next purchase" behaviour, labelled fraud patterns; suppliers, **purchase orders, supplier and customer quotations, receipts**, inventory | `src/techcart/data/generate.py` |
 | Policy corpus | Returns, warranty/TechCare+, shipping, payments (mada/Tabby/COD), B2B, PDPL privacy notice, buying guide | `src/techcart/data/policies.py` |
 | RAG eval set | 63 questions with **gold document ids** generated alongside the data | `data/rag_eval.jsonl` |
 
 For document-AI extensions, [`mychen76/invoices-and-receipts_ocr_v1`](https://huggingface.co/datasets/mychen76/invoices-and-receipts_ocr_v1) provides OCR'd invoices and receipts that can feed an LLM extraction pipeline into the same `receipts` schema.
 
-## Results (offline run, seed 42)
+## Results (seed 42; re-run `make train` after seeding from Hugging Face to get your numbers)
 
 | Component | Metric | Value | Baseline |
 |---|---|---|---|
@@ -84,7 +83,7 @@ These are honest numbers on synthetic data. The classifier's test set was used d
 
 ```
 src/techcart/
-  data/        catalog.py (HF/UCSD/offline) · generate.py (orders, POs, quotes, receipts, docs) · policies.py
+  data/        catalog.py (Hugging Face loader + spec parser) · generate.py (orders, POs, quotes, receipts, docs) · policies.py
   ml/          intent.py · recommender.py · fraud.py · forecast.py · drift.py · tracking.py (registry + MLflow)
   rag/         chunking.py · embeddings.py (Azure/hashing + cache) · store.py (BM25+vector+RRF, Azure AI Search) · retriever.py · evaluate.py
   agents/      graph.py (LangGraph) · rule_agent.py · checkout.py (MCP saga) · mcp_bridge.py · tools.py · runtime.py

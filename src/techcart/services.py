@@ -56,7 +56,7 @@ def product_card(p: dict, stock: dict | None = None) -> dict:
             "subcategory": p["subcategory"], "price": p["price"], "rating": p["rating"],
             "rating_count": p["rating_count"], "in_stock": s > 0, "stock": s,
             "stock_label": "Out of stock" if s <= 0 else f"Only {s} left" if s < 5 else "In stock",
-            "specs": json.loads(p["specs_json"] or "{}")}
+            "specs": json.loads(p["specs_json"] or "{}"), "image_url": p.get("image_url")}
 
 
 # ------------------------------------------------------------------------------- customers & orders
