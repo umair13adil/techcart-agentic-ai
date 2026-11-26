@@ -17,6 +17,9 @@ seed-refresh:       ## re-download the Hugging Face catalog
 train:              ## train + evaluate + register + gated promotion
 	$(PY) scripts/train_all.py
 
+check-azure:        ## verify Foundry deployments + Entra settings from .env
+	$(PY) scripts/check_azure.py
+
 index:              ## chunk + embed docs (Azure OpenAI if configured, else local hashing)
 	$(PY) scripts/build_index.py $(ARGS)
 

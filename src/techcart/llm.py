@@ -17,6 +17,7 @@ def chat_model(temperature: float = 0.0):
         raise LLMUnavailable("Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY")
     from langchain_openai import AzureChatOpenAI
 
+    check_endpoint()
     kwargs = dict(azure_endpoint=settings.aoai_endpoint, api_key=settings.aoai_key,
                   api_version=settings.aoai_api_version, azure_deployment=settings.aoai_chat_deployment,
                   timeout=30, max_retries=2)
@@ -26,7 +27,6 @@ def chat_model(temperature: float = 0.0):
     return AzureChatOpenAI(**kwargs)
 
 
-@lru_cache(maxsize=1)
 def check_endpoint() -> None:
     """Fail fast with a readable message when the Azure endpoint can't be reached (typo, placeholder, quotes)."""
     import socket
@@ -45,6 +45,7 @@ def check_endpoint() -> None:
                              "and your internet/VPN/DNS.") from None
 
 
+@lru_cache(maxsize=1)
 def embeddings_client():
     if not settings.llm_enabled:
         raise LLMUnavailable("Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY")

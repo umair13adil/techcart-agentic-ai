@@ -38,7 +38,7 @@ class Settings:
 
     aoai_endpoint: str = field(default_factory=lambda: _env("AZURE_OPENAI_ENDPOINT"))
     aoai_key: str = field(default_factory=lambda: _env("AZURE_OPENAI_API_KEY"))
-    aoai_api_version: str = field(default_factory=lambda: _env("AZURE_OPENAI_API_VERSION", "2024-10-21"))
+    aoai_api_version: str = field(default_factory=lambda: _env("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"))
     aoai_chat_deployment: str = field(default_factory=lambda: _env("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-5.4-mini"))
     aoai_embed_deployment: str = field(
         default_factory=lambda: _env("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-small")

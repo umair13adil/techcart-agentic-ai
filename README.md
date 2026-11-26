@@ -43,13 +43,16 @@ flowchart LR
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"            # add ".[mlops]" for MLflow
-cp .env.example .env               # Foundry + Entra ID + LangSmith settings (see below)
+cp .env.example .env               # Foundry + Entra ID + LangSmith settings: docs/AZURE_SETUP.md
+make check-azure                   # verifies endpoint, both deployments and Entra settings
 make bootstrap                     # HF catalog → store setup (stock, suppliers) → train/register models → RAG index
 make api                           # http://localhost:8000 (shop) · /admin · /docs (OpenAPI)
 make test                          # no API keys needed
 ```
 
 With Azure OpenAI configured, the assistant runs on the LangGraph graph, `make index` uses `text-embedding-3-small`, and `make eval ARGS=--langsmith` runs LLM-as-judge experiments in LangSmith.
+**New to Azure?** [`docs/AZURE_SETUP.md`](docs/AZURE_SETUP.md) walks through the portal from zero: resource group and budget, Foundry project and model deployments, Entra app registration.
+
 ### Sign-in with Microsoft Entra ID (one-time, about 5 minutes)
 
 1. Azure portal → **Microsoft Entra ID → App registrations → New registration**. Name: `TechCart`. Supported account types: *Accounts in any organizational directory and personal Microsoft accounts* (or single tenant for a client demo).
@@ -106,7 +109,7 @@ src/techcart/
   web/         shop.html · admin.html · charts.js (dependency-free SVG charts)
   auth.py (Entra ID) · events.py (SSE bus) · search.py · services.py · guardrails.py · llm.py · config.py
 scripts/       seed · train_all · build_index · eval_rag · monitor_drift · finetune_intent_aoai
-docs/          AZURE_TO_GCP.md · RESPONSIBLE_AI.md · MODEL_CARDS.md · DEMO_SCRIPT.md
+docs/          AZURE_SETUP.md · AZURE_TO_GCP.md · RESPONSIBLE_AI.md · MODEL_CARDS.md · DEMO_SCRIPT.md
 ```
 
 ## Design decisions worth discussing
