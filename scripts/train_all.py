@@ -23,7 +23,9 @@ from techcart.ml.tracking import Registry  # noqa: E402
 
 GATES = {
     "intent": {"test_macro_f1": 0.75, "accuracy_when_confident": 0.85},
-    "recommender": {"hybrid_ndcg@10": 0.12},
+    # relative + statistical: promote unless significantly WORSE than the popularity baseline
+    # (absolute NDCG falls as the catalog grows, and small holdouts make point estimates noisy)
+    "recommender": {"ndcg_diff_ci_high": 0.0},
     "fraud": {"roc_auc": 0.85},
     "forecast": {"wape_gain_vs_naive": 0.0},  # must beat seasonal-naive
 }

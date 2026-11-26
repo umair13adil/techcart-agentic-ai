@@ -99,22 +99,27 @@ class Generator:
         self.n_customers = n_customers
         self.base_daily = base_daily
         self.customers: list[dict] = []
+        self._pools: dict = {}
         self.orders: list[dict] = []
         self.items: list[dict] = []
 
     # ------------------------------------------------------------------ helpers
+    def _pool(self, cat: str, subs: set | None, brand: str | None) -> tuple[list, list]:
+        key = (cat, frozenset(subs or ()), brand)
+        if key not in self._pools:  # cached: big catalogs x tens of thousands of orders
+            pool = self.by_cat.get(cat) or []
+            if subs:
+                pool = [p for p in pool if p["subcategory"] in subs] or pool
+            if brand:
+                pool = [p for p in pool if p["brand"] == brand] or pool
+            # popularity: more reviews -> more likely; cheaper items slightly more likely
+            self._pools[key] = (pool, [math.log1p(p["rating_count"]) + 1 / (1 + p["price"] / 2000) for p in pool])
+        return self._pools[key]
+
     def _pick_product(self, cat: str, subs: set | None, brand_hint: str | None = None) -> dict | None:
-        pool = self.by_cat.get(cat) or []
-        if not pool:
-            return None
-        if subs:
-            pool = [p for p in pool if p["subcategory"] in subs] or pool
-        if brand_hint and self.rng.random() < 0.55:
-            branded = [p for p in pool if p["brand"] == brand_hint]
-            pool = branded or pool
-        # popularity: higher rating_count -> more likely; cheaper items slightly more likely
-        weights = [math.log1p(p["rating_count"]) + 1 / (1 + p["price"] / 2000) for p in pool]
-        return self.rng.choices(pool, weights=weights, k=1)[0]
+        brand = brand_hint if brand_hint and self.rng.random() < 0.55 else None
+        pool, weights = self._pool(cat, subs, brand)
+        return self.rng.choices(pool, weights=weights, k=1)[0] if pool else None
 
     def _persona_primary(self, persona: str, history_cats: list[str]) -> tuple[str, set | None]:
         prefs = PERSONAS[persona][1]

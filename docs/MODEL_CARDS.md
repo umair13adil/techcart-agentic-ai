@@ -12,6 +12,8 @@
 - **Model**: item-item co-basket cosine + sequential transition probabilities (previous 3 baskets → next), with recency decay (90-day half-life), a category-complement prior and TF-IDF content similarity. Weights are chosen by grid search on a temporal split.
 - **Business rules**: never recommend owned items, suppress durables bought in the last 180 days, in-stock only, at most 2 per category, consent-gated.
 - **Metrics (60-day temporal holdout)**: NDCG@10 0.199, HitRate@10 0.46 vs co-basket 0.177/0.40 and popularity 0.122/0.30.
+- **Scaling**: sparse co-occurrence and transition matrices; category affinity and content rows computed on demand. With large catalogs, item-level data gets thin (thousands of SKUs, each sold only a few times), so the model backs off to *learned* category affinity × the item's popularity within its category. It also reports category-level hit rate and catalog coverage.
+- **Promotion gate**: a paired-bootstrap 95% CI of NDCG(hybrid − popularity). The model is promoted unless it is *significantly worse* than the baseline. Point estimates are noisy at around 2% hit rates.
 - **Caveats**: tuned and reported on the same split; production needs a validation window plus a test window, then online A/B (CTR, attach rate, revenue per session). Prior/content terms help cold start, which this offline metric doesn't reward.
 
 ## fraud: order risk (IsolationForest)

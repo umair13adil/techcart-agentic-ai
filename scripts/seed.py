@@ -1,7 +1,9 @@
 """Seed the TechCart database + RAG documents from the Hugging Face catalog.
 
     python scripts/seed.py              # first run streams Amazon-Reviews-2023 (Electronics) from Hugging Face
-                                        # and caches it to .cache/catalog_hf.jsonl; later runs use the cache
+                                        # and caches it to .cache/catalog_hf_<size>.jsonl
+                                        # later runs use the cache
+    python scripts/seed.py --per-category 400   # bigger catalog (~6,400 products)
     python scripts/seed.py --refresh    # re-download the catalog
 """
 from __future__ import annotations
@@ -25,16 +27,20 @@ from techcart.db import connect  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--refresh", action="store_true", help="ignore the cached catalog and re-stream from HF")
-    ap.add_argument("--scan-limit", type=int, default=1_500_000, help="max HF records to scan")
+    ap.add_argument("--per-category", type=int, default=150,
+                    help="products per category (laptops x2, monitors x1.25); 150 -> ~2,400 products")
+    ap.add_argument("--orders-per-day", type=float, default=45.0, help="average daily orders (scales with catalog)")
+    ap.add_argument("--scan-limit", type=int, default=2_000_000, help="max HF records to scan")
     ap.add_argument("--days", type=int, default=540)
-    ap.add_argument("--customers", type=int, default=3200)
+    ap.add_argument("--customers", type=int, default=6000)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     t0 = time.time()
-    products = load_catalog(scan_limit=args.scan_limit, refresh=args.refresh)
-    gen = Generator(products, seed=args.seed, days=args.days, n_customers=args.customers)
+    products = load_catalog(per_category=args.per_category, scan_limit=args.scan_limit, refresh=args.refresh)
+    gen = Generator(products, seed=args.seed, days=args.days, n_customers=args.customers,
+                    base_daily=args.orders_per_day)
     gen.make_customers()
     gen.make_orders()
     supply = gen.make_supply()

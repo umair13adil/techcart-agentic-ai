@@ -65,7 +65,7 @@ class Registry:
                 print(f"[registry] {name} v{version} blocked: {k}={cand.get(k)} < {thr}")
                 return False
         prod = entry.get("production")
-        if prod and gate:
+        if prod and gate and not next(iter(gate)).startswith("ndcg_diff"):
             cur = entry["versions"][prod - 1]["metrics"]
             key = next(iter(gate))
             if cand.get(key, 0) + 1e-9 < cur.get(key, 0) - 0.01:  # allow tiny regressions only

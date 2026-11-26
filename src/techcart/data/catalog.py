@@ -3,7 +3,7 @@
 Source: `McAuley-Lab/Amazon-Reviews-2023`, folder `raw_meta_Electronics/` (10 Parquet shards, ~2 GB).
 We stream the shards (no full download), keep items whose Amazon category path is under
 "Computers & Accessories", map them to the store's 15 categories, parse specs (RAM, SSD, screen, GPU ...)
-from the `details` field and title, and cache the result to `.cache/catalog_hf.jsonl` so re-seeding is instant.
+from the `details` field and title, and cache the result to `.cache/catalog_hf_<size>.jsonl` so re-seeding is instant.
 
 The dataset repo still carries a legacy loading script, which `datasets>=4` refuses to run, so we read the
 Parquet files directly with the generic "parquet" builder over the `hf://` filesystem.
@@ -56,8 +56,13 @@ COMPLEMENTS: dict[str, list[str]] = {
 # "durable" categories you rarely re-buy right after purchase (recommender suppresses them)
 DURABLE = {"Laptops", "Desktops", "Monitors", "Graphics Cards"}
 
-# How many products to keep per category (laptops get more: they anchor most baskets)
-DEFAULT_QUOTA = {c: 28 for c in CATEGORIES} | {"Laptops": 70, "Monitors": 35, "Desktops": 25}
+DEFAULT_PER_CATEGORY = 150  # ~2,400 products in total; raise with `seed.py --per-category`
+
+
+def quotas(per_category: int = DEFAULT_PER_CATEGORY) -> dict[str, int]:
+    """Products to keep per category. Laptops get 2x: they anchor most baskets."""
+    return {c: per_category for c in CATEGORIES} | {"Laptops": per_category * 2,
+                                                    "Monitors": int(per_category * 1.25)}
 
 # --------------------------------------------------------------------------------------
 # Amazon category path -> store category. Matched leaf-first, so
@@ -281,22 +286,23 @@ def _iter_hf() -> Iterable[dict]:
     yield from ds
 
 
-def _cache_path() -> Path:
+def _cache_path(per_category: int) -> Path:
     from ..config import ROOT
 
-    return Path(os.environ.get("TECHCART_CATALOG_CACHE", ROOT / ".cache" / "catalog_hf.jsonl"))
+    default = ROOT / ".cache" / f"catalog_hf_{per_category}.jsonl"
+    return Path(os.environ.get("TECHCART_CATALOG_CACHE", default))
 
 
-def load_catalog(quota: dict[str, int] | None = None, scan_limit: int = 1_500_000, seed: int = 7,
+def load_catalog(per_category: int = DEFAULT_PER_CATEGORY, scan_limit: int = 2_000_000, seed: int = 7,
                  refresh: bool = False, records: Iterable[dict] | None = None) -> list[dict]:
     """Stream Amazon Electronics metadata from Hugging Face until every category quota is filled (or
     `scan_limit` records were read), then cache. `records` lets tests inject an iterator in the same schema."""
-    cache = _cache_path()
+    cache = _cache_path(per_category)
     if cache.exists() and not refresh and records is None:
         out = [json.loads(l) for l in cache.read_text().splitlines() if l.strip()]
         log.info("Loaded %d products from cache %s (use --refresh to re-download)", len(out), cache)
         return out
-    quota = quota or DEFAULT_QUOTA
+    quota = quotas(per_category)
     rng = random.Random(seed)
     counts = {c: 0 for c in CATEGORIES}
     seen_titles: set[str] = set()

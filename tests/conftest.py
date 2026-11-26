@@ -29,7 +29,7 @@ def dataset():
         if r.returncode:
             pytest.exit(f"{a[0]} failed (Hugging Face reachable?):\n{r.stderr[-2000:]}", returncode=1)
 
-    run("scripts/seed.py", "--days", "240", "--customers", "1200")
+    run("scripts/seed.py", "--per-category", "40", "--days", "240", "--customers", "1500", "--orders-per-day", "25")
     run("scripts/train_all.py")
     run("scripts/build_index.py", "--embedder", "hashing")
     run("scripts/simulate_traffic.py")

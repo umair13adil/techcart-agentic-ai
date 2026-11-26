@@ -9,10 +9,10 @@ install:            ## install runtime + dev deps
 bootstrap: seed train index traffic   ## everything needed for a first run
 
 seed:               ## catalog from Hugging Face (first run streams + caches to .cache/), then synthetic transactions
-	$(PY) scripts/seed.py
+	$(PY) scripts/seed.py $(ARGS)
 
 seed-refresh:       ## re-download the Hugging Face catalog
-	$(PY) scripts/seed.py --refresh
+	$(PY) scripts/seed.py --refresh $(ARGS)
 
 train:              ## train + evaluate + register + gated promotion
 	$(PY) scripts/train_all.py
