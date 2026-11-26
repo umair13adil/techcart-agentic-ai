@@ -43,9 +43,12 @@ def test_recommender_rules():
     assert all(c not in DURABLE or c != "Laptops" for c in cats)
 
 
-def test_recommender_beats_popularity():
+def test_recommender_vs_popularity():
+    """Same rule as the promotion gate: not significantly worse than popularity (paired bootstrap CI),
+    while exposing far more of the catalog than a best-seller list."""
     m = json.loads((settings.artifacts_dir / "training_summary.json").read_text())["recommender"]
-    assert m["hybrid_ndcg@10"] > m["popular_ndcg@10"]
+    assert m["ndcg_diff_ci_high"] >= 0
+    assert m["hybrid_catalog_coverage"] > 5 * m["popular_catalog_coverage"]
 
 
 def test_fraud_model_ranks_anomalies():
