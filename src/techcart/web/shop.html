@@ -31,6 +31,22 @@
   .in{color:var(--good)} .low{color:var(--warn)} .out{color:var(--bad)}
   .p button{margin-top:auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px;font:inherit;cursor:pointer}
   .p button:disabled{background:#cbd5e1}
+  .catnav{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+  .catnav a{font-size:13px;padding:6px 11px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--text);text-decoration:none;cursor:pointer}
+  .catnav a:hover,.catnav a.on{border-color:var(--accent);color:var(--accent)}
+  .catnav a b{color:var(--muted);font-weight:500;margin-left:4px}
+  .browsebar{display:flex;align-items:center;gap:10px;margin:12px 0 4px;color:var(--muted);font-size:13px}
+  .browsebar select{background:#fff;color:var(--text);border:1px solid var(--line);padding:6px 8px}
+  .catsec{margin-top:26px;scroll-margin-top:80px}
+  .cathead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .cathead h3{margin:0;font-size:17px}.cathead .n{color:var(--muted);font-size:13px}
+  .subs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 10px}
+  .subs span{font-size:12px;padding:3px 9px;border-radius:6px;background:#eef2f7;cursor:pointer;color:#334155}
+  .subs span.on{background:var(--accent);color:#fff}
+  .more{margin-top:12px;display:flex;gap:10px;align-items:center}
+  .more button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 16px;font:inherit;cursor:pointer}
+  .more button:hover{border-color:var(--accent);color:var(--accent)}
+  .more .n{color:var(--muted);font-size:13px}
   .orders{display:flex;gap:10px;flex-wrap:wrap}.order{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
   /* chat */
   #chat{position:fixed;right:20px;bottom:20px;width:400px;height:600px;max-height:calc(100vh - 100px);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 50px rgba(16,24,40,.18);display:flex;flex-direction:column;overflow:hidden;z-index:20}
@@ -72,6 +88,15 @@
   <section id="ordersSec" style="display:none"><h2>Your recent orders</h2><div class="orders" id="orders"></div></section>
   <section><h2 id="recTitle">Recommended for you</h2><p class="sub" id="recSub"></p><div class="grid" id="recs"></div></section>
   <section><h2>Trending this fortnight</h2><p class="sub">Best sellers across TechCart</p><div class="grid" id="trending"></div></section>
+  <section id="browse">
+    <h2>Shop by category <span class="sub" id="catTotal" style="font-weight:400"></span></h2>
+    <nav class="catnav" id="catnav"></nav>
+    <div class="browsebar">Sort by
+      <select id="sort"><option value="popular">Most popular</option><option value="rating">Top rated</option>
+        <option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option></select>
+    </div>
+    <div id="catalog"></div>
+  </section>
 </main>
 
 <div id="chat">
@@ -98,7 +123,7 @@ let SID = localStorage.getItem("tc_sid"), CID = "";
 
 function card(p, opts = {}) {
   const cls = !p.in_stock ? "out" : p.stock < 5 ? "low" : "in";
-  return `<div class="p"><div class="img">${p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="max-height:100%;max-width:100%;object-fit:contain">` : ICON[p.category] || "📦"}</div><div class="cat">${esc(p.category)} · ${esc(p.brand)}</div>
+  return `<div class="p"><div class="img">${p.image_url ? `<img src="${esc(p.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="max-height:100%;max-width:100%;object-fit:contain" onerror="this.replaceWith(document.createTextNode('${ICON[p.category] || "📦"}'))">` : ICON[p.category] || "📦"}</div><div class="cat">${esc(p.category)} · ${esc(p.brand)}</div>
     <div class="t">${esc(p.title)}</div>${p.reason ? `<div class="reason">${esc(p.reason)}</div>` : ""}
     <div class="price">${sar(p.price)}</div><div class="meta"><span>★ ${p.rating} (${p.rating_count})</span><span class="${cls}">${esc(p.stock_label)}</span></div>
     ${opts.noBtn ? "" : `<button ${p.in_stock ? "" : "disabled"} onclick="addToCart('${p.product_id}')">Add to cart</button>`}</div>`;
@@ -191,6 +216,50 @@ $("#chatForm").onsubmit = e => { e.preventDefault(); const t = $("#chatIn").valu
 $("#sugg").onclick = e => { if (e.target.tagName === "SPAN") send(e.target.textContent); };
 $("#chead").onclick = () => { $("#chat").classList.toggle("closed"); document.body.classList.toggle("chat-closed"); };
 $("#searchForm").onsubmit = e => { e.preventDefault(); const q = $("#q").value.trim(); if (q) doSearch(q); };
+// ---------------- catalog browsing: every category, with counts and "show more"
+const PAGE = 12, FIRST = 8;   // multiples of 4 so rows fill evenly next to the chat panel
+const browse = {};   // category -> {sub, offset, total}
+async function loadCategories() {
+  const c = await api("/api/categories");
+  $("#catTotal").textContent = `· ${c.total.toLocaleString()} products in ${c.categories.length} categories`;
+  $("#catnav").innerHTML = c.categories.map(k => `<a data-cat="${esc(k.category)}">${ICON[k.category] || ""} ${esc(k.category)}<b>${k.count.toLocaleString()}</b></a>`).join("");
+  $("#catalog").innerHTML = c.categories.map((k, i) => `
+    <div class="catsec" id="cat-${i}" data-cat="${esc(k.category)}">
+      <div class="cathead"><h3>${ICON[k.category] || ""} ${esc(k.category)}</h3><span class="n">${k.count.toLocaleString()} items</span></div>
+      <div class="subs">${k.subcategories.length > 1 ? `<span class="on" data-sub="">All</span>` + k.subcategories.map(s => `<span data-sub="${esc(s.name)}">${esc(s.name)} (${s.count})</span>`).join("") : ""}</div>
+      <div class="grid"></div>
+      <div class="more"><button style="display:none">Show more</button><span class="n"></span></div>
+    </div>`).join("");
+  document.querySelectorAll(".catsec").forEach(sec => {
+    const cat = sec.dataset.cat;
+    browse[cat] = {sub: "", offset: 0, total: 0};
+    sec.querySelector(".more button").onclick = () => loadPage(cat, false);
+    sec.querySelectorAll(".subs span").forEach(sp => sp.onclick = () => {
+      sec.querySelectorAll(".subs span").forEach(x => x.classList.remove("on")); sp.classList.add("on");
+      browse[cat].sub = sp.dataset.sub; loadPage(cat, true);
+    });
+    loadPage(cat, true);
+  });
+  document.querySelectorAll("#catnav a").forEach(a => a.onclick = () => {
+    document.querySelector(`.catsec[data-cat="${CSS.escape(a.dataset.cat)}"]`).scrollIntoView({behavior: "smooth"});
+  });
+}
+async function loadPage(cat, reset) {
+  const st = browse[cat], sec = document.querySelector(`.catsec[data-cat="${CSS.escape(cat)}"]`);
+  if (reset) { st.offset = 0; sec.querySelector(".grid").innerHTML = ""; }
+  const limit = st.offset === 0 ? FIRST : PAGE;
+  const q = new URLSearchParams({category: cat, sort: $("#sort").value, offset: st.offset, limit});
+  if (st.sub) q.set("subcategory", st.sub);
+  const r = await api(`/api/products?${q}`);
+  sec.querySelector(".grid").insertAdjacentHTML("beforeend", r.items.map(p => card(p)).join(""));
+  st.offset += r.items.length; st.total = r.total;
+  const btn = sec.querySelector(".more button"), left = r.total - st.offset;
+  btn.style.display = r.has_more ? "" : "none";
+  btn.textContent = `Show ${Math.min(PAGE, left)} more`;
+  sec.querySelector(".more .n").textContent = `Showing ${st.offset.toLocaleString()} of ${r.total.toLocaleString()}`;
+}
+$("#sort").onchange = () => Object.keys(browse).forEach(c => loadPage(c, true));
+
 $("#cartBtn").onclick = () => { const p = $("#cartPanel"); p.style.display = p.style.display === "block" ? "none" : "block"; };
 $("#who").onchange = e => { CID = e.target.value; bubble(CID ? `Signed in as ${e.target.selectedOptions[0].text}` : "Browsing as guest", "a"); loadHome(); };
 
@@ -201,6 +270,7 @@ $("#who").onchange = e => { CID = e.target.value; bubble(CID ? `Signed in as ${e
   $("#agentMode").textContent = sys.agent_mode === "llm" ? "LangGraph · Azure OpenAI" : "rule agent (no LLM key)";
   bubble("Hi! I can find laptops & accessories, compare models, recommend what goes with your setup, answer warranty/shipping questions, track orders and check you out.", "a");
   await loadHome();
+  loadCategories();
   const q0 = new URLSearchParams(location.search).get("q");   // deep link: /?q=gaming+laptop
   if (q0) { $("#q").value = q0; doSearch(q0); }
 })();

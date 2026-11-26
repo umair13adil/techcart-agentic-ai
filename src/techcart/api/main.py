@@ -159,6 +159,18 @@ async def cart(session_id: str):
     return services.cart_view(session_id)
 
 
+@app.get("/api/categories")
+async def categories():
+    return {"total": len(services.all_products()), "categories": services.catalog_counts()}
+
+
+@app.get("/api/products")
+async def products(category: str | None = None, subcategory: str | None = None, sort: str = "popular",
+                   offset: int = 0, limit: int = 12):
+    limit = max(1, min(limit, 60))
+    return services.list_products(category, subcategory, sort, max(0, offset), limit)
+
+
 @app.get("/api/products/{product_id}")
 async def product(product_id: str):
     p = services.product(product_id)

@@ -45,6 +45,40 @@ def product(pid: str) -> dict | None:
     return next((p for p in _products_cached() if p["product_id"] == pid), None)
 
 
+SORTS = {
+    "popular": lambda p: (-(p["rating_count"] or 0), p["price"]),
+    "price_asc": lambda p: p["price"],
+    "price_desc": lambda p: -p["price"],
+    "rating": lambda p: (-(p["rating"] or 0), -(p["rating_count"] or 0)),
+}
+
+
+def catalog_counts() -> list[dict]:
+    """Categories with product counts and sub-category counts (for the storefront navigation)."""
+    from collections import Counter
+
+    from .data.catalog import CATEGORIES
+
+    cats = Counter(p["category"] for p in _products_cached())
+    subs: dict[str, Counter] = {}
+    for p in _products_cached():
+        subs.setdefault(p["category"], Counter())[p["subcategory"]] += 1
+    order = {c: i for i, c in enumerate(CATEGORIES)}
+    return [{"category": c, "count": n, "subcategories": [{"name": s, "count": k} for s, k in subs[c].most_common()]}
+            for c, n in sorted(cats.items(), key=lambda x: order.get(x[0], 99))]
+
+
+def list_products(category: str | None = None, subcategory: str | None = None, sort: str = "popular",
+                  offset: int = 0, limit: int = 12) -> dict:
+    items = [p for p in _products_cached() if (not category or p["category"] == category)
+             and (not subcategory or p["subcategory"] == subcategory)]
+    items.sort(key=SORTS.get(sort, SORTS["popular"]))
+    stock = stock_map()
+    page = items[offset:offset + limit]
+    return {"category": category, "subcategory": subcategory, "sort": sort, "total": len(items), "offset": offset,
+            "items": [product_card(p, stock) for p in page], "has_more": offset + limit < len(items)}
+
+
 def stock_map() -> dict[str, int]:
     return {r["product_id"]: r["stock_on_hand"] - r["reserved"] for r in q("SELECT * FROM inventory")}
 
