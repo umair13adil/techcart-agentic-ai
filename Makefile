@@ -1,14 +1,14 @@
 PY ?= python
 export PYTHONPATH := src
 
-.PHONY: install bootstrap seed seed-refresh train index traffic eval drift test api mcp-http lint docker
+.PHONY: install bootstrap seed seed-refresh train index eval drift test api mcp-http lint docker
 
 install:            ## install runtime + dev deps
 	$(PY) -m pip install -e ".[dev]"
 
-bootstrap: seed train index traffic   ## everything needed for a first run
+bootstrap: seed train index   ## store setup: real catalog, cold-start models, RAG index
 
-seed:               ## catalog from Hugging Face (first run streams + caches to .cache/), then synthetic transactions
+seed:               ## real products from Hugging Face (cached in .cache/) + opening stock + suppliers; no fake activity
 	$(PY) scripts/seed.py $(ARGS)
 
 seed-refresh:       ## re-download the Hugging Face catalog
@@ -19,9 +19,6 @@ train:              ## train + evaluate + register + gated promotion
 
 index:              ## chunk + embed docs (Azure OpenAI if configured, else local hashing)
 	$(PY) scripts/build_index.py
-
-traffic:            ## backfill 30 days of search logs (drift + insights demo)
-	$(PY) scripts/simulate_traffic.py
 
 eval:               ## RAG retrieval eval (+ LangSmith LLM-judge with: make eval ARGS=--langsmith)
 	$(PY) scripts/eval_rag.py $(ARGS)

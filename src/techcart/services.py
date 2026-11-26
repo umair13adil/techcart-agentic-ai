@@ -95,7 +95,7 @@ def product_card(p: dict, stock: dict | None = None) -> dict:
 
 # ------------------------------------------------------------------------------- customers & orders
 def customer(cid: str) -> dict | None:
-    r = q("SELECT customer_id, name, city, segment, is_business, marketing_consent FROM customers WHERE customer_id=?",
+    r = q("SELECT customer_id, name, email, city, segment, is_business, marketing_consent FROM customers WHERE customer_id=?",
           (cid,))
     return r[0] if r else None
 
@@ -182,8 +182,42 @@ def create_order(session_id: str, customer_id: str, payment_method: str, ship_ci
                                                                 l["line_total"]))
     execute("INSERT INTO receipts VALUES (?,?,?,?,?,?)", ("R" + oid[1:], oid, now, cart["total"], payment_method,
                                                           payment_ref))
+    risk, reasons, scorer = score_order(oid)  # online fraud scoring, persisted with its explanation
     CARTS.pop(session_id, None)
-    return {"order_id": oid, "total": cart["total"], "status": "processing", "created_at": now}
+    from .events import BUS
+
+    BUS.publish({"type": "order", "order_id": oid, "ts": now, "total": cart["total"], "city": ship_city,
+                 "channel": channel, "risk": risk, "risk_reasons": reasons,
+                 "items": [{"title": l["title"][:60], "qty": l["qty"]} for l in cart["lines"]]})
+    return {"order_id": oid, "total": cart["total"], "status": "processing", "created_at": now, "risk": risk}
+
+
+def score_order(order_id: str) -> tuple[float, list[str], str]:
+    """Rules always; plus the IsolationForest percentile once a model has been trained on real orders."""
+    import pandas as pd
+
+    from .ml import fraud
+    from .ml.tracking import Registry
+
+    o = pd.DataFrame(q("SELECT * FROM orders WHERE order_id=?", (order_id,)))
+    items = pd.DataFrame(q("SELECT * FROM order_items WHERE order_id=?", (order_id,)))
+    cust = pd.DataFrame(q("SELECT customer_id, created_at, city FROM customers WHERE customer_id=?",
+                          (o.iloc[0]["customer_id"],)))
+    if cust.empty:
+        cust = pd.DataFrame([{"customer_id": o.iloc[0]["customer_id"], "created_at": o.iloc[0]["created_at"],
+                              "city": o.iloc[0]["ship_city"]}])
+    prods = pd.DataFrame(q("SELECT product_id, category FROM products"))
+    feats = fraud.build_features(o, items, cust, prods)
+    feats["prior_orders"] = q("SELECT COUNT(*) n FROM orders WHERE customer_id=? AND order_id!=?",
+                              (o.iloc[0]["customer_id"], order_id))[0]["n"]
+    try:
+        model = Registry().load("fraud")
+    except (FileNotFoundError, KeyError):
+        model = None
+    risk, reasons, scorer = fraud.score_order(feats, model)
+    execute("UPDATE orders SET risk_score=?, risk_reasons=?, risk_model=? WHERE order_id=?",
+            (risk, json.dumps(reasons), scorer, order_id))
+    return risk, reasons, scorer
 
 
 def audit(session_id: str, actor: str, action: str, payload: dict) -> None:
@@ -193,11 +227,34 @@ def audit(session_id: str, actor: str, action: str, payload: dict) -> None:
             (datetime.now().isoformat(timespec="seconds"), session_id, actor, action, redact(json.dumps(payload))))
 
 
-def log_search(session_id: str, query: str, intent: str, conf: float, used_llm: bool) -> None:
+def log_search(session_id: str, query: str, intent: str, conf: float, used_llm: bool, source: str = "search",
+               customer_id: str | None = None, entities: dict | None = None, results: int | None = None) -> None:
+    """Persist the AI's reading of every query (intent, confidence, which tier decided, extracted entities)."""
+    from .events import BUS
     from .guardrails import redact
 
-    execute("INSERT INTO search_log VALUES (?,?,?,?,?,?)", (datetime.now().isoformat(timespec="seconds"), session_id,
-                                                         redact(query), intent, conf, int(used_llm)))
+    ts = datetime.now().isoformat(timespec="seconds")
+    ents = {k: v for k, v in (entities or {}).items() if v not in (None, [], "") and k != "keywords"}
+    execute("""INSERT INTO search_log (ts, session_id, query, intent, confidence, used_llm, source, customer_id,
+               entities, results) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (ts, session_id, redact(query), intent, conf, int(used_llm), source, customer_id, json.dumps(ents), results))
+    BUS.publish({"type": "query", "ts": ts, "source": source, "query": redact(query)[:80], "intent": intent,
+                 "confidence": round(conf, 2), "tier": "llm" if used_llm else "classifier", "entities": ents})
+
+
+def log_chat(session_id: str, customer_id: str | None, role: str, content: str, intent: str | None = None,
+             route: str | None = None, tools: list[str] | None = None, latency_ms: int | None = None,
+             status: str = "ok") -> None:
+    from .events import BUS
+    from .guardrails import redact
+
+    ts = datetime.now().isoformat(timespec="seconds")
+    execute("INSERT INTO chat_log VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (ts, session_id, customer_id, role, redact(content)[:4000], intent, route, json.dumps(tools or []),
+             latency_ms, status))
+    if role == "assistant":
+        BUS.publish({"type": "chat", "ts": ts, "route": route, "intent": intent, "tools": tools or [],
+                     "latency_ms": latency_ms, "status": status})
 
 
 def new_session() -> str:

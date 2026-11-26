@@ -31,7 +31,6 @@ def _env(name: str, default: str = "") -> str:
 class Settings:
     data_dir: Path = field(default_factory=lambda: Path(_env("TECHCART_DATA_DIR", str(ROOT / "data"))).resolve())
     currency: str = field(default_factory=lambda: _env("CURRENCY", "SAR"))
-    agent_mode: str = field(default_factory=lambda: _env("AGENT_MODE", "llm"))
     mcp_mode: str = field(default_factory=lambda: _env("MCP_MODE", "inproc"))
     vector_backend: str = field(default_factory=lambda: _env("VECTOR_BACKEND", "local"))
 
@@ -42,6 +41,15 @@ class Settings:
     aoai_embed_deployment: str = field(
         default_factory=lambda: _env("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-small")
     )
+
+    # Microsoft Entra ID sign-in
+    entra_tenant: str = field(default_factory=lambda: _env("ENTRA_TENANT", "common"))
+    entra_client_id: str = field(default_factory=lambda: _env("ENTRA_CLIENT_ID"))
+    entra_client_secret: str = field(default_factory=lambda: _env("ENTRA_CLIENT_SECRET"))
+    entra_redirect_uri: str = field(default_factory=lambda: _env("ENTRA_REDIRECT_URI", "http://localhost:8000/auth/callback"))
+    admin_emails: frozenset = field(default_factory=lambda: frozenset(
+        e.strip().lower() for e in _env("ADMIN_EMAILS").split(",") if e.strip()))
+    session_ttl_hours: int = field(default_factory=lambda: int(_env("SESSION_TTL_HOURS", "12")))
 
     mcp_urls: dict = field(
         default_factory=lambda: {

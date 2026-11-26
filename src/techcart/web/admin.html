@@ -42,29 +42,45 @@
   .cites{margin-top:6px;font-size:12px;color:var(--muted)} .muted{color:var(--muted)} code{font-size:12px;color:var(--violet)}
   .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:12px;padding:3px 8px;border-radius:6px;background:var(--panel2);border:1px solid var(--line)}
   .scroll{max-height:260px;overflow:auto}
+  .empty{color:var(--muted);font-size:13px;padding:14px 4px;line-height:1.5}
+  .gate{max-width:560px;margin:80px auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+  .gate a.btn{display:inline-block;margin-top:12px;background:#fff;color:#111;border-radius:8px;padding:10px 16px;text-decoration:none;font-weight:600}
+  .ev.q{border-left-color:var(--violet)} .ev.c{border-left-color:var(--good)}
+  .stats{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:10px}.stats div b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
   @media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
 </style>
 </head>
 <body>
 <header>
   <h1>Tech<span>Cart</span> · Admin Intelligence</h1>
-  <span class="pill live" id="livePill">Live</span>
-  <span class="pill" id="modePill">agent: …</span>
+  <span class="pill adm" id="livePill" style="display:none">Connecting…</span>
+  <span class="pill adm" id="dataPill" style="display:none"></span>
   <span class="sp"></span>
-  <span class="pill" id="todayPill">Today: –</span>
-  <a href="/">Open storefront →</a>
+  <span class="pill adm" id="todayPill" style="display:none">Today: –</span>
+  <span class="muted" id="who" style="font-size:13px"></span>
+  <a href="/">Storefront</a><a href="/auth/logout" id="signout" style="display:none">Sign out</a>
 </header>
-<main>
+<div id="gate"></div>
+<main id="main" style="display:none">
   <section class="kpis" id="kpis"></section>
 
   <section class="card s8">
-    <h2>Revenue · last 120 days + 14-day forecast <small class="muted" id="fcNote"></small></h2>
+    <h2>Revenue · daily <small class="muted" id="fcNote"></small></h2>
     <div id="revChart"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>Actual (daily)</span><span><i style="background:var(--good)"></i>7-day avg</span><span><i style="background:var(--violet)"></i>Forecast (80% band)</span></div>
+    <div class="legend" id="revLegend"><span><i style="background:var(--accent)"></i>Actual (daily)</span><span><i style="background:var(--good)"></i>7-day avg</span><span><i style="background:var(--violet)"></i>Forecast (80% band)</span></div>
   </section>
   <section class="card s4">
-    <h2>Live orders <small class="muted">SSE · risk-scored on arrival</small></h2>
-    <div class="feed" id="feed"><div class="muted">Waiting for orders…</div></div>
+    <h2>Live activity <small class="muted">real orders, queries and assistant turns</small></h2>
+    <div class="feed" id="feed"><div class="empty">Waiting for activity. Searches, assistant replies and orders appear here the moment they happen.</div></div>
+  </section>
+
+  <section class="card s7">
+    <h2>Recent orders <small class="muted">risk scored at checkout</small></h2>
+    <div class="scroll"><table id="ordersTbl"></table></div>
+  </section>
+  <section class="card s5">
+    <h2>Fraud review queue <small class="muted" id="fraudMode"></small></h2>
+    <div class="scroll"><table id="riskTbl"></table></div>
   </section>
 
   <section class="card s4"><h2>Revenue by category · 30d</h2><div id="catBars"></div></section>
@@ -75,33 +91,33 @@
   </section>
 
   <section class="card s6">
-    <h2>Fraud review queue <small class="muted">IsolationForest · top 1% risk</small></h2>
-    <div class="scroll"><table id="riskTbl"></table></div>
+    <h2>Query intelligence · 7d <small class="muted">AI reading of every search &amp; chat message</small></h2>
+    <div class="stats" id="searchStats"></div>
+    <div id="intentBars"></div>
+    <div style="margin-top:10px" class="muted">What shoppers ask for (extracted category):</div>
+    <div id="askedBars"></div>
+    <div style="margin-top:10px" class="muted">Searches with no results:</div>
+    <div class="chips" id="zeroRes" style="margin-top:6px"></div>
+    <div style="margin-top:10px" class="muted">Low-confidence queries (labelling queue):</div>
+    <div class="chips" id="lowConf" style="margin-top:6px"></div>
   </section>
   <section class="card s6">
-    <h2>Search &amp; assistant insights · 7d</h2>
-    <div class="row" style="gap:18px;margin-bottom:8px" id="searchStats"></div>
-    <div id="intentBars"></div>
-    <div style="margin-top:10px" class="muted">Low-confidence queries (active-learning queue):</div>
-    <div class="chips" id="lowConf" style="margin-top:6px"></div>
+    <h2>Assistant · 7d <small class="muted">LangGraph on Microsoft Foundry</small></h2>
+    <div class="stats" id="asstStats"></div>
+    <div class="muted">Routed to:</div><div id="routeBars"></div>
+    <div style="margin-top:10px" class="muted">Tools called:</div><div id="toolBars"></div>
   </section>
 
   <section class="card s5">
-    <h2>Ops copilot <small class="muted">RAG over POs, quotations &amp; policies (staff scope)</small></h2>
-    <div class="row"><input id="askIn" placeholder="e.g. What is the status and total of quotation QT-C-0041?"><button id="askBtn">Ask</button></div>
+    <h2>Ops copilot <small class="muted">RAG over policies, products, quotes, POs (staff scope)</small></h2>
+    <div class="row"><input id="askIn" placeholder="e.g. What is our return window for opened items?"><button id="askBtn">Ask</button></div>
     <div class="answer" id="askOut"></div>
   </section>
-  <section class="card s4">
-    <h2>Drift monitor <small class="muted">PSI</small></h2>
-    <div id="drift"></div>
-  </section>
-  <section class="card s3" style="grid-column:span 3">
-    <h2>Model registry</h2>
-    <div id="models" style="font-size:12.5px"></div>
-  </section>
+  <section class="card s4"><h2>Drift monitor <small class="muted">PSI</small></h2><div id="drift"></div></section>
+  <section class="card s3" style="grid-column:span 3"><h2>Models</h2><div id="models" style="font-size:12.5px"></div></section>
 
   <section class="card s7">
-    <h2>Agent audit trail <small class="muted">PII-redacted</small></h2>
+    <h2>Audit trail <small class="muted">PII-redacted</small></h2>
     <div class="scroll"><table id="auditTbl"></table></div>
   </section>
   <section class="card s5">
@@ -113,88 +129,147 @@
 <script>
 const $ = s => document.querySelector(s);
 const sar = v => Math.round(v).toLocaleString() + " SAR";
-const api = (p, o) => fetch(p, o).then(r => r.json());
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let todayRevenue = 0, todayOrders = 0;
+const empty = (msg) => `<div class="empty">${msg}</div>`;
+async function api(p, o) {
+  const r = await fetch(p, o);
+  if (r.status === 401) { location.href = "/auth/login?next=/admin"; throw new Error("auth"); }
+  if (!r.ok) { const e = new Error((await r.json().catch(() => ({}))).detail || r.statusText); e.status = r.status; throw e; }
+  return r.json();
+}
+let todayRevenue = 0, todayOrders = 0, DATA = {};
+
+function gate(title, body, link) {
+  $("#gate").innerHTML = `<div class="gate"><h2 style="margin:0 0 8px">${title}</h2><div class="muted">${body}</div>${link || ""}</div>`;
+}
 
 async function loadKpis() {
   const k = await api("/api/admin/kpis?days=30");
-  const d = v => v == null ? "" : `<div class="d ${v >= 0 ? "up" : "down"}">${v >= 0 ? "▲" : "▼"} ${Math.abs(v)}% vs prev 30d</div>`;
-  const tiles = [["Revenue (30d)", (k.revenue / 1e6).toFixed(2) + "M SAR", d(k.revenue_delta_pct)], ["Orders", k.orders.toLocaleString(), d(k.orders_delta_pct)],
-    ["Avg order value", sar(k.aov), d(k.aov_delta_pct)], ["Gross margin", k.gross_margin_pct + "%", '<div class="d muted">ex-VAT</div>'],
-    ["Return rate", k.return_rate_pct + "%", '<div class="d muted">of orders</div>'], ["Via AI assistant", k.assistant_share_pct + "%", '<div class="d muted">of orders</div>'],
-    ["Fraud alerts", k.risky_orders, '<div class="d muted">top-1% risk, 30d</div>']];
+  const d = v => v == null ? '<div class="d muted">no prior period</div>' : `<div class="d ${v >= 0 ? "up" : "down"}">${v >= 0 ? "▲" : "▼"} ${Math.abs(v)}% vs prev 30d</div>`;
+  const none = !k.orders;
+  const tiles = [["Revenue (30d)", none ? "–" : sar(k.revenue), none ? '<div class="d muted">no orders yet</div>' : d(k.revenue_delta_pct)],
+    ["Orders", k.orders.toLocaleString(), none ? '<div class="d muted">placed via checkout</div>' : d(k.orders_delta_pct)],
+    ["Avg order value", none ? "–" : sar(k.aov), none ? "" : d(k.aov_delta_pct)],
+    ["Gross margin", none ? "–" : k.gross_margin_pct + "%", '<div class="d muted">ex-VAT</div>'],
+    ["Customers", DATA.customers.toLocaleString(), '<div class="d muted">signed in with Microsoft</div>'],
+    ["Via AI assistant", none ? "–" : k.assistant_share_pct + "%", '<div class="d muted">of orders</div>'],
+    ["Fraud alerts", k.risky_orders, '<div class="d muted">risk ≥ 0.6, 30d</div>']];
   $("#kpis").innerHTML = tiles.map(([l, v, x]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div>${x}</div>`).join("");
 }
 
 async function loadRevenue() {
   const t = await api("/api/admin/timeseries?days=120");
+  if (!t.history.length) {
+    $("#revChart").innerHTML = empty("No sales recorded yet. Orders placed through checkout appear here, and the 14-day forecast starts once there are 56 days of sales.");
+    $("#revLegend").style.display = "none"; $("#fcNote").textContent = ""; return;
+  }
+  $("#revLegend").style.display = "";
   const pts = t.history.map(r => ({x: new Date(r.d), y: r.revenue}));
   const ma = pts.map((p, i) => ({x: p.x, y: pts.slice(Math.max(0, i - 6), i + 1).reduce((a, b) => a + b.y, 0) / Math.min(i + 1, 7)}));
-  const fc = t.forecast.map(f => ({x: new Date(f.date), y: f.yhat}));
-  const band = t.forecast.map(f => ({x: new Date(f.date), lo: f.lo, hi: f.hi}));
-  lineChart($("#revChart"), [
-    {name: "Actual", color: "#4f8cff", points: pts, width: 1.2},
-    {name: "7-day avg", color: "#3fb950", points: ma, width: 2.2},
-    {name: "Forecast", color: "#a371f7", points: fc, dashed: true, band, width: 2}], {height: 250});
-  if (t.forecast.length) {
-    const next7 = t.forecast.slice(0, 7).reduce((a, b) => a + b.yhat, 0);
-    $("#fcNote").textContent = `next 7 days ≈ ${sar(next7)}`;
-  }
+  const series = [{name: "Actual", color: "#4f8cff", points: pts, width: 1.2}, {name: "7-day avg", color: "#3fb950", points: ma, width: 2.2}];
+  if (t.forecast.length) series.push({name: "Forecast", color: "#a371f7", dashed: true, width: 2,
+    points: t.forecast.map(f => ({x: new Date(f.date), y: f.yhat})), band: t.forecast.map(f => ({x: new Date(f.date), lo: f.lo, hi: f.hi}))});
+  lineChart($("#revChart"), series, {height: 250});
+  $("#fcNote").textContent = t.forecast.length ? `next 7 days ≈ ${sar(t.forecast.slice(0, 7).reduce((a, b) => a + b.yhat, 0))}`
+    : `forecast starts after 56 days of sales (have ${DATA.days_with_sales})`;
   const today = new Date().toISOString().slice(0, 10), tr = t.history.find(r => r.d === today);
   if (tr) { todayRevenue = tr.revenue; todayOrders = tr.orders; } updateToday();
 }
 function updateToday() { $("#todayPill").textContent = `Today: ${sar(todayRevenue)} · ${todayOrders} orders`; }
 
+function riskBadge(r) { return r == null ? '<span class="badge">–</span>' : `<span class="badge ${r >= 0.6 ? "bad" : r >= 0.3 ? "warn" : "good"}">${(r * 100).toFixed(0)}</span>`; }
+
 async function loadTables() {
-  const [cats, top, stock, risky, si, audit, sys, drift] = await Promise.all([
-    api("/api/admin/categories"), api("/api/admin/top-products"), api("/api/admin/low-stock"), api("/api/admin/risky-orders"),
-    api("/api/admin/search-insights"), api("/api/admin/audit"), api("/api/system"), api("/api/admin/drift")]);
-  hbar($("#catBars"), cats.map(c => ({label: c.category, value: c.revenue})));
-  $("#topTbl").innerHTML = "<tr><th>Product</th><th class=n>Units</th><th class=n>Revenue</th></tr>" +
-    top.map(p => `<tr><td>${esc(p.title.split(" - ")[0])}</td><td class=n>${p.units}</td><td class=n>${Math.round(p.revenue).toLocaleString()}</td></tr>`).join("");
-  $("#stockTbl").innerHTML = "<tr><th>Item</th><th class=n>Avail</th><th class=n>ROP</th><th class=n>Reorder</th></tr>" +
-    (Array.isArray(stock) ? stock : []).map(s => `<tr><td>${esc(s.title.split(" - ")[0])}</td><td class=n>${s.available <= 0 ? '<span class="badge bad">0</span>' : s.available}</td><td class=n>${s.reorder_point}</td><td class=n>${s.suggested_qty}</td></tr>`).join("");
-  $("#riskTbl").innerHTML = "<tr><th>Order</th><th>When</th><th class=n>Total</th><th>Pay</th><th>Ship / profile city</th><th>Customer since</th><th class=n>Risk</th></tr>" +
-    risky.map(r => `<tr><td><code>${r.order_id}</code></td><td>${r.created_at.replace("T", " ").slice(5, 16)}</td><td class=n>${Math.round(r.total).toLocaleString()}</td><td>${r.payment_method}</td><td>${r.ship_city}${r.ship_city !== r.profile_city ? ' <span class="badge warn">≠ ' + r.profile_city + "</span>" : ""}</td><td>${r.customer_since}</td><td class=n><span class="badge bad">${(r.risk_score * 100).toFixed(1)}</span></td></tr>`).join("");
-  $("#searchStats").innerHTML = `<div><div class="muted">Queries</div><b>${si.queries.toLocaleString()}</b></div><div><div class="muted">Avg confidence</div><b>${(si.avg_confidence * 100).toFixed(1)}%</b></div><div><div class="muted">LLM fallback</div><b>${(si.llm_fallback_rate * 100).toFixed(1)}%</b></div>`;
-  hbar($("#intentBars"), si.intents.map(i => ({label: i.intent.replace("_", " "), value: i.n})), {color: "var(--violet)", fmt: v => v});
-  $("#lowConf").innerHTML = si.needs_labeling.map(q => `<span class="chip" title="${q.intent} @ ${q.confidence}">${esc(q.query)}${q.n > 1 ? ` <span class="muted">×${q.n}</span>` : ""}</span>`).join("") || '<span class="muted">none</span>';
-  $("#auditTbl").innerHTML = "<tr><th>Time</th><th>Actor</th><th>Action</th><th>Payload</th></tr>" +
-    audit.map(a => `<tr><td>${a.ts.slice(5, 16).replace("T", " ")}</td><td>${a.actor}</td><td>${a.action}</td><td class="muted">${esc(a.payload).slice(0, 90)}</td></tr>`).join("") || "<tr><td class=muted>No agent actions yet - try the storefront assistant.</td></tr>";
+  const [ov, cats, top, stock, risky, recent, si, asst, audit, sys, drift] = await Promise.all([
+    api("/api/admin/overview"), api("/api/admin/categories"), api("/api/admin/top-products"), api("/api/admin/low-stock"),
+    api("/api/admin/risky-orders"), api("/api/admin/recent-orders"), api("/api/admin/search-insights"),
+    api("/api/admin/assistant"), api("/api/admin/audit"), api("/api/admin/system"), api("/api/admin/drift")]);
+  DATA = ov.data;
+  $("#dataPill").textContent = `${DATA.products.toLocaleString()} products · ${DATA.customers} customers · ${DATA.orders} orders · ${DATA.searches} queries`;
+  cats.length ? hbar($("#catBars"), cats.map(c => ({label: c.category, value: c.revenue}))) : $("#catBars").innerHTML = empty("No sales in the last 30 days.");
+  $("#topTbl").innerHTML = top.length ? "<tr><th>Product</th><th class=n>Units</th><th class=n>Revenue</th></tr>" +
+    top.map(p => `<tr><td>${esc(p.title.split(" - ")[0].slice(0, 60))}</td><td class=n>${p.units}</td><td class=n>${Math.round(p.revenue).toLocaleString()}</td></tr>`).join("")
+    : `<tr><td>${empty("No sales in the last 30 days.")}</td></tr>`;
+  $("#stockTbl").innerHTML = (Array.isArray(stock) && stock.length) ? "<tr><th>Item</th><th class=n>Avail</th><th class=n>ROP</th><th class=n>Reorder</th></tr>" +
+    stock.map(s => `<tr><td>${esc(s.title.split(" - ")[0].slice(0, 50))}</td><td class=n>${s.available <= 0 ? '<span class="badge bad">0</span>' : s.available}</td><td class=n>${s.reorder_point}</td><td class=n>${s.suggested_qty}</td></tr>`).join("")
+    : `<tr><td>${empty("Nothing at or below its reorder point.")}</td></tr>`;
+  $("#ordersTbl").innerHTML = recent.length ? "<tr><th>Order</th><th>When</th><th>Customer</th><th class=n>Total</th><th>Pay</th><th>Status</th><th class=n>Risk</th></tr>" +
+    recent.map(o => `<tr><td><code>${o.order_id}</code></td><td>${o.created_at.replace("T", " ").slice(5, 16)}</td><td>${esc(o.customer || "")}</td><td class=n>${Math.round(o.total).toLocaleString()}</td><td>${o.payment_method}</td><td>${o.status}</td><td class=n title="${esc(o.risk_reasons.join(", "))}">${riskBadge(o.risk_score)}</td></tr>`).join("")
+    : `<tr><td>${empty("No orders yet. Orders placed through the assistant's checkout are stored here with their risk score and reasons.")}</td></tr>`;
+  const fm = ov.models.fraud;
+  $("#fraudMode").textContent = fm ? "IsolationForest + rules" : `rules (model trains after ${500} orders)`;
+  $("#riskTbl").innerHTML = risky.length ? "<tr><th>Order</th><th>When</th><th class=n>Total</th><th>Why</th><th class=n>Risk</th></tr>" +
+    risky.map(r => `<tr><td><code>${r.order_id}</code></td><td>${r.created_at.replace("T", " ").slice(5, 16)}</td><td class=n>${Math.round(r.total).toLocaleString()}</td><td class="muted">${esc(r.risk_reasons.join(", "))}</td><td class=n>${riskBadge(r.risk_score)}</td></tr>`).join("")
+    : `<tr><td>${empty("No orders flagged. Each order is scored at checkout; flagged ones (≥ 0.6) wait here for review.")}</td></tr>`;
+  if (!si.queries) {
+    $("#searchStats").innerHTML = ""; $("#intentBars").innerHTML = empty("No queries yet. Every storefront search and chat message is analysed (intent, confidence, entities) and stored.");
+    $("#askedBars").innerHTML = ""; $("#zeroRes").innerHTML = '<span class="muted">none</span>'; $("#lowConf").innerHTML = '<span class="muted">none</span>';
+  } else {
+    $("#searchStats").innerHTML = `<div><span class="muted">Queries</span><b>${si.queries.toLocaleString()}</b></div><div><span class="muted">Avg confidence</span><b>${(si.avg_confidence * 100).toFixed(1)}%</b></div><div><span class="muted">Sent to LLM</span><b>${(si.llm_fallback_rate * 100).toFixed(1)}%</b></div><div><span class="muted">Median budget</span><b>${si.median_budget ? sar(si.median_budget) : "–"}</b></div>`;
+    hbar($("#intentBars"), si.intents.map(i => ({label: i.intent.replace("_", " "), value: i.n})), {color: "var(--violet)", fmt: v => v});
+    si.asked_categories.length ? hbar($("#askedBars"), si.asked_categories.slice(0, 6).map(c => ({label: c.category, value: c.n})), {fmt: v => v}) : $("#askedBars").innerHTML = '<span class="muted">none yet</span>';
+    $("#zeroRes").innerHTML = si.zero_result.map(q => `<span class="chip">${esc(q.query)} <span class="muted">×${q.n}</span></span>`).join("") || '<span class="muted">none</span>';
+    $("#lowConf").innerHTML = si.needs_labeling.map(q => `<span class="chip" title="${q.intent} @ ${q.confidence}">${esc(q.query)}</span>`).join("") || '<span class="muted">none</span>';
+  }
+  if (!asst.turns) {
+    $("#asstStats").innerHTML = ""; $("#routeBars").innerHTML = empty(sys.assistant === "llm" ? "No assistant conversations yet." : `Assistant offline: ${esc(sys.assistant_error)}`); $("#toolBars").innerHTML = "";
+  } else {
+    $("#asstStats").innerHTML = `<div><span class="muted">Turns</span><b>${asst.turns}</b></div><div><span class="muted">Sessions</span><b>${asst.sessions}</b></div><div><span class="muted">p50 / p95</span><b>${asst.p50_ms ?? "–"} / ${asst.p95_ms ?? "–"} ms</b></div><div><span class="muted">Errors</span><b>${asst.errors}</b></div><div><span class="muted">Orders</span><b>${asst.orders_via_assistant}</b></div>`;
+    hbar($("#routeBars"), asst.routes.map(r => ({label: r.route, value: r.n})), {color: "var(--good)", fmt: v => v});
+    asst.tools.length ? hbar($("#toolBars"), asst.tools.slice(0, 8).map(t => ({label: t.tool, value: t.n})), {fmt: v => v}) : $("#toolBars").innerHTML = '<span class="muted">none</span>';
+  }
+  $("#auditTbl").innerHTML = audit.length ? "<tr><th>Time</th><th>Actor</th><th>Action</th><th>Payload</th></tr>" +
+    audit.map(a => `<tr><td>${a.ts.slice(5, 16).replace("T", " ")}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td><td class="muted">${esc(a.payload).slice(0, 90)}</td></tr>`).join("")
+    : `<tr><td>${empty("No actions recorded yet.")}</td></tr>`;
   $("#mcpTbl").innerHTML = "<tr><th>Server</th><th>Tool</th><th>Purpose</th></tr>" +
     sys.mcp_tools.map(t => `<tr><td><span class="badge">${t.server}</span></td><td><code>${t.tool}</code></td><td class="muted">${esc(t.description).slice(0, 70)}</td></tr>`).join("");
-  $("#modePill").textContent = `agent: ${sys.agent_mode} · mcp: ${sys.mcp_mode}`;
-  $("#models").innerHTML = Object.entries(sys.models).map(([n, m]) => {
-    const key = Object.entries(m.metrics).filter(([k, v]) => typeof v === "number" && /f1|ndcg@10|roc_auc|weekly_wape_model|accuracy_when/.test(k) && !/cobasket|popular/.test(k)).slice(0, 2);
-    return `<div style="margin-bottom:8px"><b>${n}</b> <span class="badge good">prod v${m.production ?? "-"}</span> <span class="muted">latest v${m.latest}</span><div class="muted">${key.map(([k, v]) => `${k}: ${v}`).join(" · ")}</div></div>`;
-  }).join("");
-  const sigs = drift.signals || {};
-  $("#drift").innerHTML = Object.entries(sigs).map(([k, v]) => v.psi !== undefined ?
+  const modeLabel = {cold_start: "cold start", trained: "trained on orders"};
+  $("#models").innerHTML = Object.entries(ov.models).map(([n, m]) => {
+    const mode = m.metrics.mode ? `<span class="badge warn">${modeLabel[m.metrics.mode] || m.metrics.mode}</span>` : `<span class="badge good">prod v${m.production ?? "-"}</span>`;
+    const note = m.metrics.needs_orders ? `learns from orders after ${m.metrics.needs_orders} (have ${m.metrics.orders})`
+      : Object.entries(m.metrics).filter(([k, v]) => typeof v === "number" && /macro_f1|ndcg@10|roc_auc|weekly_wape_model/.test(k) && !/cobasket|popular/.test(k)).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(" · ");
+    return `<div style="margin-bottom:8px"><b>${n}</b> ${mode}<div class="muted">${note}</div></div>`;
+  }).join("") + (ov.models.fraud ? "" : `<div style="margin-bottom:8px"><b>fraud</b> <span class="badge warn">rules</span><div class="muted">model trains after 500 orders (have ${DATA.orders})</div></div>`)
+    + (ov.models.forecast ? "" : `<div><b>forecast</b> <span class="badge warn">waiting</span><div class="muted">needs 56 days of sales (have ${DATA.days_with_sales})</div></div>`);
+  const sigs = Object.entries(drift.signals || {});
+  $("#drift").innerHTML = sigs.length ? sigs.map(([k, v]) => v.psi !== undefined ?
       `<div class="hbar" style="grid-template-columns:150px 1fr 90px"><span>${k.replace(/_/g, " ")}</span><span class="hbar-track"><span class="hbar-fill" style="width:${Math.min(100, v.psi / 0.4 * 100)}%;background:${v.status === "stable" ? "var(--good)" : v.status === "moderate" ? "var(--warn)" : "var(--bad)"}"></span></span><span class="badge ${v.status === "stable" ? "good" : v.status === "moderate" ? "warn" : "bad"}">${v.psi}</span></div>`
       : `<div class="muted" style="font-size:12px">LLM fallback: ${(v.ref * 100).toFixed(1)}% → ${(v.cur * 100).toFixed(1)}%</div>`).join("") +
-    `<div style="margin-top:8px">${drift.retrain_recommended ? '<span class="badge bad">Retraining recommended</span>' : '<span class="badge good">No action needed</span>'}</div>`;
+      `<div style="margin-top:8px">${drift.retrain_recommended ? '<span class="badge bad">Retraining recommended</span>' : '<span class="badge good">No action needed</span>'}</div>`
+    : empty("Needs at least a week of real queries and orders to compare against the previous period.");
 }
 
 function addEvent(ev) {
   const feed = $("#feed");
-  if (feed.firstElementChild && feed.firstElementChild.classList.contains("muted")) feed.innerHTML = "";
-  const risky = ev.risk >= 0.99;
+  if (feed.firstElementChild && feed.firstElementChild.classList.contains("empty")) feed.innerHTML = "";
   const div = document.createElement("div");
-  div.className = "ev" + (risky ? " risk" : "");
-  div.innerHTML = `<div class="t">${ev.ts.slice(11, 19)}<br>${ev.channel}</div>
-    <div><div class="amt">${sar(ev.total)} <span class="muted" style="font-weight:400">· ${ev.city}</span></div>
-    <div class="items">${ev.items.map(i => `${i.qty}× ${esc(i.title)}`).join("<br>")}</div>
-    ${risky ? `<div class="items" style="color:var(--bad)">⚠ ${ev.risk_reasons.join(", ") || "anomalous pattern"}</div>` : ""}</div>
-    <div><span class="badge ${risky ? "bad" : ev.risk > 0.9 ? "warn" : "good"}">risk ${(ev.risk * 100).toFixed(0)}</span></div>`;
+  if (ev.type === "order") {
+    const risky = ev.risk >= 0.6;
+    div.className = "ev" + (risky ? " risk" : "");
+    div.innerHTML = `<div class="t">${ev.ts.slice(11, 19)}<br>order</div>
+      <div><div class="amt">${sar(ev.total)} <span class="muted" style="font-weight:400">· ${esc(ev.city)}</span></div>
+      <div class="items">${ev.items.map(i => `${i.qty}× ${esc(i.title)}`).join("<br>")}</div>
+      ${ev.risk_reasons.length ? `<div class="items" style="color:${risky ? "var(--bad)" : "var(--warn)"}">⚠ ${esc(ev.risk_reasons.join(", "))}</div>` : ""}</div>
+      <div>${riskBadge(ev.risk)}</div>`;
+    todayRevenue += ev.total; todayOrders += 1; updateToday(); loadKpis(); loadTables(); loadRevenue();
+  } else if (ev.type === "query") {
+    div.className = "ev q";
+    const ents = Object.entries(ev.entities || {}).map(([k, v]) => `${k}: ${v}`).join(" · ");
+    div.innerHTML = `<div class="t">${ev.ts.slice(11, 19)}<br>${ev.source}</div>
+      <div><div>“${esc(ev.query)}”</div><div class="items">${ev.intent.replace("_", " ")} · ${(ev.confidence * 100).toFixed(0)}% · ${ev.tier}${ents ? " · " + esc(ents) : ""}</div></div><div></div>`;
+  } else if (ev.type === "chat") {
+    div.className = "ev c";
+    div.innerHTML = `<div class="t">${ev.ts.slice(11, 19)}<br>assistant</div>
+      <div><div>${esc(ev.route || "-")} agent${ev.tools.length ? " · " + esc(ev.tools.join(", ")) : ""}</div><div class="items">${ev.status === "ok" ? "" : esc(ev.status)}</div></div>
+      <div><span class="badge">${ev.latency_ms ?? "–"} ms</span></div>`;
+  } else return;
   feed.prepend(div);
-  while (feed.children.length > 40) feed.lastChild.remove();
-  todayRevenue += ev.total; todayOrders += 1; updateToday();
+  while (feed.children.length > 50) feed.lastChild.remove();
 }
 
 function connect() {
   const es = new EventSource("/api/admin/stream");
-  es.onmessage = m => { const ev = JSON.parse(m.data); if (ev.type === "order") { addEvent(ev); if (ev.risk >= 0.99) loadKpis(); } };
+  es.onmessage = m => addEvent(JSON.parse(m.data));
   es.onopen = () => { $("#livePill").className = "pill live"; $("#livePill").textContent = "Live"; };
   es.onerror = () => { $("#livePill").className = "pill"; $("#livePill").textContent = "Reconnecting…"; };
 }
@@ -202,14 +277,25 @@ function connect() {
 $("#askBtn").onclick = async () => {
   const q = $("#askIn").value.trim(); if (!q) return;
   const out = $("#askOut"); out.style.display = "block"; out.textContent = "Thinking…";
-  const r = await api("/api/admin/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q})});
-  out.innerHTML = esc(r.answer) + `<div class="cites">${r.citations.map(c => `[${c.n}] ${esc(c.title)}`).join(" · ")}</div>`;
+  try {
+    const r = await api("/api/admin/ask", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({question: q})});
+    out.innerHTML = esc(r.answer) + `<div class="cites">${r.citations.map(c => `[${c.n}] ${esc(c.title)}`).join(" · ")}</div>`;
+  } catch (e) { out.textContent = e.message; }
 };
 $("#askIn").addEventListener("keydown", e => { if (e.key === "Enter") $("#askBtn").click(); });
 
-loadKpis(); loadRevenue(); loadTables();
-if (!location.search.includes("nolive")) connect();  // ?nolive for static screenshots
-setInterval(loadTables, 30000); setInterval(loadKpis, 60000);
+(async () => {
+  const me = await fetch("/api/me").then(r => r.json());
+  if (!me.auth_configured) return gate("Sign-in is not configured", "Admins sign in with Microsoft Entra ID. Set ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET and ADMIN_EMAILS in .env, then restart the API. See the README.");
+  if (me.user) $("#signout").style.display = "";
+  if (!me.user) return gate("Admin sign-in", "Sign in with the Microsoft account listed in ADMIN_EMAILS.", `<a class="btn" href="/auth/login?next=/admin">Sign in with Microsoft</a>`);
+  if (!me.user.is_admin) return gate("Not an administrator", `${esc(me.user.email)} is signed in but isn't listed in ADMIN_EMAILS.`, `<a class="btn" href="/">Back to the store</a>`);
+  $("#who").textContent = me.user.name; $("#main").style.display = "";
+  document.querySelectorAll(".adm").forEach(e => e.style.display = "");
+  await loadTables(); loadKpis(); loadRevenue();
+  if (!location.search.includes("nolive")) connect(); else $("#livePill").textContent = "Live feed off";
+  setInterval(loadTables, 30000); setInterval(loadKpis, 60000);
+})();
 </script>
 </body>
 </html>

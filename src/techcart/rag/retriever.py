@@ -24,13 +24,59 @@ def index_path() -> Path:
     return settings.data_dir / "index"
 
 
+def business_documents() -> list[tuple[dict, str]]:
+    """Receipts, customer quotations and purchase orders that REALLY exist in the database (created by checkout,
+    the B2B agent and the ERP MCP server), rendered as documents for the staff/owner-scoped part of the index."""
+    from .. import services
+
+    docs: list[tuple[dict, str]] = []
+    money = lambda x: f"{x:,.2f} SAR"  # noqa: E731
+    for r in services.q("""SELECT r.*, o.customer_id, o.status, o.subtotal, o.shipping, o.vat, o.total, o.ship_city
+                           FROM receipts r JOIN orders o USING(order_id)"""):
+        items = services.q("""SELECT p.title, i.qty, i.line_total FROM order_items i JOIN products p USING(product_id)
+                              WHERE i.order_id=?""", (r["order_id"],))
+        rows = "\n".join(f"| {i['title'][:70]} | {i['qty']} | {money(i['line_total'])} |" for i in items)
+        docs.append(({"doc_id": r["receipt_id"], "doc_type": "receipt", "audience": "owner",
+                      "title": f"Receipt {r['receipt_id']} for order {r['order_id']}", "order_id": r["order_id"],
+                      "customer_id": r["customer_id"]},
+                     f"# Receipt {r['receipt_id']} for order {r['order_id']}\n\n**Date:** {r['issued_at']}  |  "
+                     f"**Payment:** {r['payment_method']} ({r['txn_ref']})  |  **Status:** {r['status']}  |  "
+                     f"**Ship to:** {r['ship_city']}\n\n| Item | Qty | Amount |\n|---|---|---|\n{rows}\n\n"
+                     f"Shipping {money(r['shipping'])}. **Total paid:** {money(r['total'])} (VAT {money(r['vat'])})."))
+    for qt in services.q("SELECT * FROM quotations"):
+        lines = services.q("""SELECT p.title, l.qty, l.unit_price FROM quote_lines l JOIN products p USING(product_id)
+                              WHERE l.quote_id=?""", (qt["quote_id"],))
+        rows = "\n".join(f"| {l['title'][:70]} | {l['qty']} | {money(l['unit_price'])} |" for l in lines)
+        docs.append(({"doc_id": qt["quote_id"], "doc_type": "quotation", "audience": "internal",
+                      "title": f"Quotation {qt['quote_id']}", "party_id": qt["party_id"], "status": qt["status"]},
+                     f"# Quotation {qt['quote_id']}\n\n**Party:** {qt['party_id']}  |  **Date:** {qt['created_at']}  |  "
+                     f"**Valid until:** {qt['valid_until']}  |  **Status:** {qt['status']}\n\n| Item | Qty | Unit price |\n"
+                     f"|---|---|---|\n{rows}\n\n**Total:** {money(qt['total'])}\n\nNotes: {qt['notes']}"))
+    for po in services.q("SELECT p.*, s.name AS supplier FROM purchase_orders p LEFT JOIN suppliers s USING(supplier_id)"):
+        lines = services.q("""SELECT pr.title, l.qty, l.unit_cost FROM po_lines l JOIN products pr USING(product_id)
+                              WHERE l.po_id=?""", (po["po_id"],))
+        rows = "\n".join(f"| {l['title'][:70]} | {l['qty']} | {money(l['unit_cost'])} |" for l in lines)
+        docs.append(({"doc_id": po["po_id"], "doc_type": "purchase_order", "audience": "internal",
+                      "title": f"Purchase Order {po['po_id']} - {po['supplier']}", "status": po["status"]},
+                     f"# Purchase Order {po['po_id']} - {po['supplier']}\n\n**Created:** {po['created_at']}  |  "
+                     f"**Expected:** {po['expected_at']}  |  **Status:** {po['status']}\n\n| Item | Qty | Unit cost |\n"
+                     f"|---|---|---|\n{rows}\n\n**PO total:** {money(po['total_cost'])}"))
+    return docs
+
+
 def build_index(embedder_kind: str = "auto") -> dict:
+    """Index = product sheets + policies (files from seed) + business documents that exist in the database.
+    Re-run after real activity (e.g. nightly) to make new receipts/quotes/POs searchable."""
     manifest = [json.loads(l) for l in (settings.docs_dir / "manifest.jsonl").read_text().splitlines()]
     chunks = []
     for m in manifest:
         md = (settings.docs_dir / m["path"]).read_text()
         meta = {k: v for k, v in m.items() if k not in ("path",)}
         chunks.extend(chunk_markdown(m["doc_id"], md, meta))
+    business = business_documents()
+    for meta, md in business:
+        chunks.extend(chunk_markdown(meta["doc_id"], md, meta))
+    manifest += [m for m, _ in business]
     emb = get_embedder(embedder_kind)
     vecs = emb.embed([c.text for c in chunks])
     store = LocalHybridStore(chunks, vecs, emb.name)

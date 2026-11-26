@@ -10,4 +10,4 @@ RUN useradd -m app && mkdir -p /data && chown -R app /data
 USER app
 EXPOSE 8000
 # first start: build data, models and index if the volume is empty, then serve
-CMD ["sh", "-c", "[ -f /data/techcart.db ] || (python scripts/seed.py && python scripts/train_all.py && python scripts/build_index.py && python scripts/simulate_traffic.py); uvicorn techcart.api.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "[ -f /data/techcart.db ] || (python scripts/seed.py && python scripts/train_all.py && python scripts/build_index.py); uvicorn techcart.api.main:app --host 0.0.0.0 --port 8000"]

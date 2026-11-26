@@ -32,6 +32,9 @@ def _norm_cooc(C: sparse.csr_matrix) -> sparse.csr_matrix:
     return S.tocsr()
 
 
+MIN_ORDERS_TO_EVALUATE = 300   # below this, there is no meaningful temporal holdout
+
+
 class HybridRecommender:
     """Sparse implementation: memory grows with observed co-purchases, not with products^2, so it handles
     catalogs of tens of thousands of SKUs. Category-prior and content rows are computed on demand."""
@@ -43,6 +46,7 @@ class HybridRecommender:
     # ------------------------------------------------------------------ fit
     def fit(self, products: pd.DataFrame, orders: pd.DataFrame, items: pd.DataFrame) -> "HybridRecommender":
         self.products = products[["product_id", "title", "category", "subcategory", "brand"]].reset_index(drop=True)
+        reviews = dict(zip(products["product_id"], products["rating_count"].fillna(0)))
         self.pid = list(self.products["product_id"])
         self.idx = {p: i for i, p in enumerate(self.pid)}
         self.cat = dict(zip(self.products["product_id"], self.products["category"]))
@@ -83,23 +87,35 @@ class HybridRecommender:
         G = sparse.csr_matrix((np.ones(n), (np.arange(n), self.cat_of)), shape=(n, nc))  # item -> category
         learned = (G.T @ ((B.T @ B) + T) @ G).toarray().astype(np.float32)
         np.fill_diagonal(learned, learned.diagonal() * 0.3)  # same-category repeats are weaker signals
-        learned /= np.maximum(learned.sum(1, keepdims=True), 1e-9)
-        prior /= np.maximum(prior.sum(1, keepdims=True), 1e-9)
-        self.P_cat = 0.7 * learned + 0.3 * prior
+        evidence = learned.sum(1, keepdims=True)
+        learned /= np.maximum(evidence, 1e-9)
+        prior /= np.maximum(prior.max(1, keepdims=True), 1e-9)  # top complement = 1.0, comparable to similarity
+        # trust learned affinities only where baskets exist; a category with no orders yet uses the prior alone
+        alpha = 0.7 * np.minimum(evidence / 50.0, 1.0)
+        self.P_cat = (alpha * learned / np.maximum(learned.max(1, keepdims=True), 1e-9) + (1 - alpha) * prior)
         units = df.groupby("product_id")["qty"].sum()
-        u = np.log1p(np.array([units.get(p, 0) for p in self.pid], dtype=np.float32)) + 0.1
-        cat_tot = np.bincount(self.cat_of, weights=u, minlength=nc)
-        self.pop_in_cat = (u / cat_tot[self.cat_of]).astype(np.float32)
+        # store sales dominate once they exist; Amazon review volume is the cold-start prior
+        u = (np.log1p(np.array([units.get(p, 0) for p in self.pid], dtype=np.float32)) * 3
+             + 0.3 * np.log1p(np.array([reviews.get(p, 0) for p in self.pid], dtype=np.float32)) + 0.1)
+        cat_max = np.zeros(nc, dtype=np.float32)
+        np.maximum.at(cat_max, self.cat_of, u)
+        self.pop_in_cat = (u / cat_max[self.cat_of]).astype(np.float32)  # 1.0 = best seller of its category
         # content: L2-normalised TF-IDF rows; similarity row = X @ x_i^T on demand
         text = (self.products["title"] + " " + self.products["category"] + " " + self.products["subcategory"].fillna("")
                 + " " + self.products["brand"]).str.lower()
         self.X = TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True).fit_transform(text).tocsr()
-        # popularity (last 30 days of the training window)
-        end = pd.to_datetime(df["created_at"]).max()
-        recent = df[pd.to_datetime(df["created_at"]) >= end - pd.Timedelta(days=30)]
-        pop = recent.groupby("product_id")["qty"].sum()
-        self.popularity = np.array([pop.get(p, 0) for p in self.pid], dtype=float)
-        self.ref_time = end.to_pydatetime()
+        # popularity: store sales in the last 30 days; with no sales yet, Amazon review volume (cold start)
+        self.n_orders = int(df["order_id"].nunique())
+        if self.n_orders:
+            end = pd.to_datetime(df["created_at"]).max()
+            recent = df[pd.to_datetime(df["created_at"]) >= end - pd.Timedelta(days=30)]
+            pop = recent.groupby("product_id")["qty"].sum()
+            self.popularity = np.array([pop.get(p, 0) for p in self.pid], dtype=float)
+            self.ref_time = end.to_pydatetime()
+        else:
+            self.popularity = np.log1p(np.array([reviews.get(p, 0) for p in self.pid], dtype=float))
+            self.ref_time = datetime.now()
+        self.mode = "trained" if self.n_orders >= MIN_ORDERS_TO_EVALUATE else "cold_start"
         return self
 
     def _row(self, i: int) -> np.ndarray:
@@ -148,12 +164,21 @@ class HybridRecommender:
                 continue
             per_cat[c] += 1
             rec = {"product_id": p, "score": round(float(s[j]), 4)}
-            if explain and history:
-                anchors = [(hp, self.S_co[self.idx[hp], j] + self.S_tr[self.idx[hp], j]) for hp, _ in history
-                           if hp in self.idx]
-                best = max(anchors, key=lambda x: x[1])[0] if anchors else None
-                rec["because_of"] = best
-                rec["reason"] = f"Customers who bought {self.cat.get(best)} often add {c}" if best else "Trending"
+            if explain:
+                cold = getattr(self, "mode", "trained") == "cold_start"
+                best = None
+                if history:
+                    anchors = [(hp, self.S_co[self.idx[hp], j] + self.S_tr[self.idx[hp], j]) for hp, _ in history
+                               if hp in self.idx]
+                    best = max(anchors, key=lambda x: x[1])[0] if anchors else history[-1][0]
+                    rec["because_of"] = best
+                # Explanations must describe the evidence actually used: no "customers who bought" before orders exist.
+                if best and not cold:
+                    rec["reason"] = f"Customers who bought {self.cat.get(best)} often add {c}"
+                elif best:
+                    rec["reason"] = f"Goes with your {self.cat.get(best, 'purchase')}"
+                else:
+                    rec["reason"] = "Popular on Amazon" if cold else "Popular at TechCart"
             out.append(rec)
             if len(out) >= k:
                 break

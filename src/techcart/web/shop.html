@@ -67,6 +67,18 @@
   .cin{display:flex;border-top:1px solid var(--line)}.cin input{flex:1;border:0;padding:14px;font:inherit;outline:none}
   .cin button{border:0;background:none;color:var(--accent);padding:0 16px;font:inherit;font-weight:600;cursor:pointer}
   .sugg{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 10px;background:#fafbfc}.sugg span{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;background:#fff}
+  .acct{display:flex;align-items:center;gap:8px}
+  .acct a,.acct button.link{color:#e2e8f0;text-decoration:none;font-size:13px;background:none;border:1px solid #334155;border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit}
+  .acct .ms{background:#fff;color:#111;border-color:#fff;font-weight:600}
+  .acct .name{color:#cbd5e1;font-size:13px}
+  .notice{align-self:stretch;font-size:12.5px;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:8px 10px}
+  .empty{color:var(--muted);font-size:13px;padding:6px 2px}
+  .chint{color:var(--muted);font-size:13px;text-align:center;margin:auto 10px}
+  #profile{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50}
+  #profile form{background:#fff;border-radius:14px;padding:20px;width:360px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+  #profile input,#profile select{border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;color:var(--text);background:#fff}
+  #profile .row{display:flex;gap:8px;justify-content:flex-end}
+  #profile button{border:0;border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
   #cartPanel{position:fixed;top:64px;right:20px;width:360px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(16,24,40,.15);padding:14px;display:none;z-index:30;font-size:13px}
   #cartPanel table{width:100%;border-collapse:collapse}#cartPanel td{padding:5px 0;border-bottom:1px solid var(--line)}
 </style>
@@ -75,19 +87,30 @@
 <header>
   <div class="logo">Tech<span>Cart</span></div>
   <form class="search" id="searchForm"><input id="q" placeholder="Try: gaming laptop under 6000 SAR with 16GB RAM · 4k monitor for my macbook · silent mouse" autocomplete="off"><button>Search</button></form>
-  <select id="who"><option value="">Guest</option></select>
+  <div class="acct" id="acct"></div>
   <button class="cartbtn" id="cartBtn">Cart<b id="cartCount">0</b></button>
   <a href="/admin">Admin →</a>
 </header>
 
 <div id="cartPanel"></div>
+<div id="profile"><form id="profileForm">
+  <b>Your delivery details</b>
+  <span style="color:#667085;font-size:13px">Used for delivery and checkout. Change them any time.</span>
+  <label>City <select id="pfCity" required>
+    <option value="">Choose…</option><option>Riyadh</option><option>Jeddah</option><option>Dammam</option><option>Khobar</option>
+    <option>Mecca</option><option>Medina</option><option>Abha</option><option>Tabuk</option><option>Buraydah</option><option>Other</option></select></label>
+  <label>Mobile (optional) <input id="pfPhone" placeholder="05XXXXXXXX" maxlength="20"></label>
+  <label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="pfConsent">
+    <span>Personalise recommendations using my order history (you can withdraw this any time, PDPL).</span></label>
+  <div class="row"><button type="button" id="pfCancel">Later</button><button type="submit" style="background:#2563eb;color:#fff">Save</button></div>
+</form></div>
 
 <main>
   <div class="understood" id="understood"></div>
   <section id="resultsSec" style="display:none"><h2 id="resultsTitle">Results</h2><p class="sub" id="resultsSub"></p><div class="grid" id="results"></div></section>
   <section id="ordersSec" style="display:none"><h2>Your recent orders</h2><div class="orders" id="orders"></div></section>
   <section><h2 id="recTitle">Recommended for you</h2><p class="sub" id="recSub"></p><div class="grid" id="recs"></div></section>
-  <section><h2>Trending this fortnight</h2><p class="sub">Best sellers across TechCart</p><div class="grid" id="trending"></div></section>
+  <section><h2 id="trendTitle">Best sellers</h2><p class="sub" id="trendSub"></p><div class="grid" id="trending"></div></section>
   <section id="browse">
     <h2>Shop by category <span class="sub" id="catTotal" style="font-weight:400"></span></h2>
     <nav class="catnav" id="catnav"></nav>
@@ -100,7 +123,7 @@
 </main>
 
 <div id="chat">
-  <div class="chead" id="chead">💬 <b>TechCart Assistant</b><small id="agentMode">AI agent</small></div>
+  <div class="chead" id="chead">💬 <b>TechCart Assistant</b><small id="agentMode"></small></div>
   <div class="msgs" id="msgs"></div>
   <div class="sugg" id="sugg">
     <span>Gaming laptop under 6000 SAR</span><span>Compare MacBook Air vs Zenbook 14</span><span>What goes with my laptop?</span>
@@ -119,7 +142,7 @@ const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[(\d+)\]
 const ICON = {"Laptops": "💻", "Desktops": "🖥️", "Monitors": "🖥", "Keyboards": "⌨️", "Mice": "🖱️", "Headsets": "🎧", "Webcams": "📷",
   "Docks & Hubs": "🔌", "Storage": "💾", "Memory": "🧠", "Graphics Cards": "🎮", "Networking": "📶", "Bags & Sleeves": "🎒",
   "Chargers & Power": "🔋", "Cooling Pads": "❄️"};
-let SID = localStorage.getItem("tc_sid"), CID = "";
+let SID = localStorage.getItem("tc_sid"), ME = null, SYS = {};
 
 function card(p, opts = {}) {
   const cls = !p.in_stock ? "out" : p.stock < 5 ? "low" : "in";
@@ -132,12 +155,18 @@ function card(p, opts = {}) {
 async function ensureSession() { if (!SID) { SID = (await api("/api/session")).session_id; localStorage.setItem("tc_sid", SID); } }
 
 async function loadHome() {
-  const h = await api(`/api/home?session_id=${SID}` + (CID ? `&customer_id=${CID}` : ""));
+  const h = await api(`/api/home?session_id=${SID}`);
   $("#recs").innerHTML = h.recommendations.map(p => card(p)).join("");
   $("#trending").innerHTML = h.trending.map(p => card(p)).join("");
-  $("#recTitle").textContent = h.personalised ? `Picked for you, ${h.customer.name.split(" ")[0]}` : "Popular right now";
-  $("#recSub").textContent = h.personalised ? "Next-purchase recommendations from your order history (hybrid co-purchase + sequence model)"
-    : CID ? "Personalisation is off for this account (no consent) - showing trending items" : "Sign in to get personalised recommendations";
+  const first = h.user ? h.user.name.split(" ")[0] : "";
+  $("#recTitle").textContent = h.personalised ? `Picked for you, ${first}` : h.user ? `Recommended for you, ${first}` : "Popular picks across categories";
+  $("#recSub").textContent = h.personalised ? "Next-purchase recommendations from your own order history"
+    : h.user && !h.user.marketing_consent ? "Personalisation is off (no consent) - turn it on in your profile"
+    : h.user ? "Based on what's in your cart and what usually goes together, until you've placed an order"
+    : "Ranked by real Amazon review volume - sign in with Microsoft for recommendations based on your orders";
+  $("#trendTitle").textContent = h.trending_source === "store_sales" ? "Best sellers this fortnight" : "Most reviewed on Amazon";
+  $("#trendSub").textContent = h.trending_source === "store_sales" ? "From TechCart orders in the last 14 days"
+    : "TechCart hasn't recorded sales yet - ranked by Amazon review count";
   $("#ordersSec").style.display = h.recent_orders.length ? "" : "none";
   $("#orders").innerHTML = h.recent_orders.map(o => `<div class="order"><b>${o.order_id}</b> · ${o.created_at.slice(0, 10)} · ${sar(o.total)} · ${o.status}</div>`).join("");
   refreshCart();
@@ -166,12 +195,15 @@ async function refreshCart(show) {
   $("#cartCount").textContent = c.lines.reduce((a, l) => a + l.qty, 0);
   $("#cartPanel").innerHTML = `<b>Your cart</b><table>${c.lines.map(l => `<tr><td>${l.qty}× ${esc(l.title)}</td><td style="text-align:right">${sar(l.line_total)}</td></tr>`).join("") || "<tr><td>Empty</td></tr>"}</table>
     <p>Shipping: ${c.shipping ? sar(c.shipping) : "Free"} · <b>Total ${sar(c.total)}</b> <span style="color:#667085">(incl. VAT ${sar(c.vat_included)})</span></p>
-    ${c.lines.length ? `<button onclick="openChatWith('Checkout with mada')" style="width:100%;border:0;background:#2563eb;color:#fff;border-radius:8px;padding:9px;cursor:pointer">Checkout with the assistant</button>` : ""}`;
+    ${!c.lines.length ? "" : SYS.assistant !== "llm"
+      ? `<div class="notice">Checkout runs through the assistant, which is offline until Microsoft Foundry is configured.</div>`
+      : `<button onclick="${ME ? "openChatWith('I want to check out')" : `location.href='/auth/login?next=/'`}" style="width:100%;border:0;background:#2563eb;color:#fff;border-radius:8px;padding:9px;cursor:pointer">${ME ? "Checkout with the assistant" : "Sign in with Microsoft to check out"}</button>`}`;
   if (show) { $("#cartPanel").style.display = "block"; setTimeout(() => $("#cartPanel").style.display = "none", 2500); }
 }
 
 // ---------------- chat
-function bubble(text, who) { const d = document.createElement("div"); d.className = "m " + who; d.innerHTML = who === "a" ? md(text) : esc(text); $("#msgs").appendChild(d); scroll(); }
+function notice(text) { $(".chint")?.remove(); const d = document.createElement("div"); d.className = "notice"; d.textContent = text; $("#msgs").appendChild(d); scroll(); }
+function bubble(text, who) { $(".chint")?.remove(); const d = document.createElement("div"); d.className = "m " + who; d.innerHTML = who === "a" ? md(text) : esc(text); $("#msgs").appendChild(d); scroll(); }
 function scroll() { $("#msgs").scrollTop = 1e9; }
 function trace(r) {
   const t = document.createElement("div"); t.className = "trace";
@@ -185,14 +217,16 @@ function confirmCard(p) {
   d.innerHTML = `<b>Confirm your order</b><br>${p.lines.map(l => `${l.qty}× ${esc(l.title)}`).join("<br>")}
     <br>Delivery: ${esc(p.city)} · ${esc(p.shipping.carrier)} (${p.shipping.fee ? sar(p.shipping.fee) : "free"}, ~${p.shipping.eta_days} day)
     <br><b>Total ${sar(p.total)}</b> via ${p.payment_method.replace("_", " ")} (VAT ${sar(p.vat_included)})
-    <div class="row">${p.needs_otp ? `<input placeholder="Bank OTP (any 6 digits in demo)" class="otp">` : ""}<button class="ok">Confirm & pay</button><button class="no">Cancel</button></div>`;
+    <div class="row">${p.needs_otp ? `<input placeholder="One-time password from your bank" class="otp">` : ""}<button class="ok">Confirm & pay</button><button class="no">Cancel</button></div>`;
   d.querySelector(".ok").onclick = () => confirmOrder(true, d.querySelector(".otp")?.value, d);
   d.querySelector(".no").onclick = () => confirmOrder(false, null, d);
   $("#msgs").appendChild(d); scroll();
 }
 async function confirmOrder(ok, otp, node) {
   node.querySelectorAll("button").forEach(b => b.disabled = true);
-  const r = await post("/api/chat/confirm", {session_id: SID, customer_id: CID || null, approved: ok, otp: otp || null});
+  let r;
+  try { r = await post("/api/chat/confirm", {session_id: SID, approved: ok, otp: otp || null}); }
+  catch (e) { notice(e.message); return; }
   bubble(r.reply, "a");
   if (r.pending) confirmCard(r.pending);
   refreshCart(); if (ok) loadHome();
@@ -201,14 +235,14 @@ async function send(text) {
   bubble(text, "u");
   const wait = document.createElement("div"); wait.className = "m a"; wait.textContent = "…"; $("#msgs").appendChild(wait); scroll();
   try {
-    const r = await post("/api/chat", {session_id: SID, customer_id: CID || null, message: text});
+    const r = await post("/api/chat", {session_id: SID, message: text});
     wait.remove(); bubble(r.reply || "(no reply)", "a");
     if (r.products && r.products.length) {
       const m = document.createElement("div"); m.className = "mini"; m.innerHTML = r.products.slice(0, 6).map(p => card(p)).join(""); $("#msgs").appendChild(m);
     }
     if (r.pending) confirmCard(r.pending);
     trace(r); refreshCart(); scroll();
-  } catch (e) { wait.textContent = "Sorry, something went wrong: " + e.message; }
+  } catch (e) { wait.remove(); notice(e.message); }
 }
 function openChatWith(t) { $("#chat").classList.remove("closed"); document.body.classList.remove("chat-closed"); send(t); }
 
@@ -261,14 +295,36 @@ async function loadPage(cat, reset) {
 $("#sort").onchange = () => Object.keys(browse).forEach(c => loadPage(c, true));
 
 $("#cartBtn").onclick = () => { const p = $("#cartPanel"); p.style.display = p.style.display === "block" ? "none" : "block"; };
-$("#who").onchange = e => { CID = e.target.value; bubble(CID ? `Signed in as ${e.target.selectedOptions[0].text}` : "Browsing as guest", "a"); loadHome(); };
+// ---------------- account: Microsoft Entra ID sign-in + delivery profile
+function renderAccount() {
+  const here = encodeURIComponent(location.pathname + location.search);
+  if (!SYS.auth_configured) { $("#acct").innerHTML = `<span class="name" title="Set ENTRA_CLIENT_ID / ENTRA_CLIENT_SECRET">Sign-in not configured</span>`; return; }
+  $("#acct").innerHTML = ME
+    ? `<span class="name">${esc(ME.name)}${ME.city ? " · " + esc(ME.city) : ""}</span>
+       <button class="link" id="editProfile">Profile</button>${ME.is_admin ? `<a href="/admin">Admin</a>` : ""}<a href="/auth/logout">Sign out</a>`
+    : `<a class="ms" href="/auth/login?next=${here}">Sign in with Microsoft</a>`;
+  $("#editProfile")?.addEventListener("click", openProfile);
+}
+function openProfile() {
+  $("#pfCity").value = ME?.city || ""; $("#pfPhone").value = ME?.phone || ""; $("#pfConsent").checked = !!ME?.marketing_consent;
+  $("#profile").style.display = "flex";
+}
+$("#pfCancel").onclick = () => $("#profile").style.display = "none";
+$("#profileForm").onsubmit = async e => {
+  e.preventDefault();
+  ME = (await post("/api/me/profile", {city: $("#pfCity").value, phone: $("#pfPhone").value || null, marketing_consent: $("#pfConsent").checked})).user;
+  $("#profile").style.display = "none"; renderAccount(); loadHome();
+};
 
 (async () => {
   await ensureSession();
-  const [demo, sys] = await Promise.all([api("/api/customers/demo"), api("/api/system")]);
-  $("#who").innerHTML += demo.map(c => `<option value="${c.customer_id}">${esc(c.name)} · ${c.segment} · ${c.city}</option>`).join("");
-  $("#agentMode").textContent = sys.agent_mode === "llm" ? "LangGraph · Azure OpenAI" : "rule agent (no LLM key)";
-  bubble("Hi! I can find laptops & accessories, compare models, recommend what goes with your setup, answer warranty/shipping questions, track orders and check you out.", "a");
+  const [me, sys] = await Promise.all([api("/api/me"), api("/api/system")]);
+  ME = me.user; SYS = sys; renderAccount();
+  if (ME && !ME.city) openProfile();   // first sign-in: ask for delivery city + consent
+  $("#agentMode").textContent = sys.assistant === "llm" ? "Microsoft Foundry · LangGraph" : "offline";
+  $("#msgs").innerHTML = sys.assistant === "llm"
+    ? `<div class="chint">Ask about products, compare models, track an order, or check out.</div>`
+    : `<div class="notice">The assistant is unavailable: ${esc(sys.assistant_error || "not configured")}. Search and browsing still work.</div>`;
   await loadHome();
   loadCategories();
   const q0 = new URLSearchParams(location.search).get("q");   // deep link: /?q=gaming+laptop

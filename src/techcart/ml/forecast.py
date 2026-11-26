@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
 
+MIN_DAYS = 56  # 28-day backtest + 28 days to learn from
+
 RAMADAN = [(date(2025, 3, 1), date(2025, 3, 30)), (date(2026, 2, 18), date(2026, 3, 19)),
            (date(2027, 2, 8), date(2027, 3, 9))]
 

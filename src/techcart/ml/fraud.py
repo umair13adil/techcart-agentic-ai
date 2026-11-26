@@ -98,3 +98,33 @@ def train(feats: pd.DataFrame, contamination: float = 0.01, seed: int = 0) -> tu
 
 def score(model: FraudModel, feats: pd.DataFrame) -> np.ndarray:
     return model.percentile(feats)
+
+
+# ---------------------------------------------------------------------- cold start: rules (no history needed)
+MIN_ORDERS_TO_TRAIN = 500
+RULES = [  # (weight, reason, predicate on a feature row)
+    (0.30, "new account (<2 days)", lambda r: r["account_age_days"] < 2),
+    (0.15, "placed 1-5 AM", lambda r: r["night"] == 1),
+    (0.20, "ship city differs from profile", lambda r: r["city_mismatch"] == 1),
+    (0.30, "3+ high-value units", lambda r: r["max_qty"] >= 3 and r["high_value_share"] > 0.8),
+    (0.20, "very high basket (>20,000 SAR)", lambda r: r["log_total"] > np.log1p(20000)),
+]
+RULE_ALERT = 0.6
+
+
+def rule_score(row: pd.Series) -> tuple[float, list[str]]:
+    hits = [(w, why) for w, why, f in RULES if f(row)]
+    return min(1.0, sum(w for w, _ in hits)), [why for _, why in hits]
+
+
+def score_order(feats: pd.DataFrame, model: "FraudModel | None") -> tuple[float, list[str], str]:
+    """Online scoring at checkout. Returns (risk 0..1, reasons, which scorer). Rules always explain the score;
+    once a model is trained on real orders its percentile is blended in."""
+    row = feats.iloc[0]
+    r, reasons = rule_score(row)
+    if model is None:
+        return round(r, 4), reasons, "rules"
+    pct = float(model.percentile(feats)[0])
+    if pct >= ALERT_PERCENTILE and "anomalous vs. history" not in reasons:
+        reasons.append("anomalous vs. order history")
+    return round(max(r, pct if pct >= 0.95 else 0.0), 4), reasons, "rules+isolation_forest"

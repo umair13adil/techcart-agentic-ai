@@ -46,28 +46,47 @@ def main() -> None:
                       card={"report": report, "labels": list(pipe.classes_)})
     summary["intent"] = {"version": v, "promoted": reg.promote("intent", v, GATES["intent"]), **m}
 
-    # 2) recommender: evaluate on temporal split, then refit on all data -----------------
-    best_w, m, grid = recommender.tune(P, O, I)
-    rec = recommender.HybridRecommender(**best_w).fit(P, O[O["status"] != "cancelled"], I)
-    v = reg.log_model("recommender", rec, m, params={**rec.w, "grid": grid})
-    summary["recommender"] = {"version": v, "promoted": reg.promote("recommender", v, GATES["recommender"]), **m}
+    live = O[O["status"] != "cancelled"]
+    n_orders = len(live)
 
-    # 3) fraud / order risk ----------------------------------------------------------------
-    F = fraud.build_features(O, I, C, P)
-    model, m = fraud.train(F)
-    v = reg.log_model("fraud", model, m, params={"model": "IsolationForest", "contamination": 0.01,
-                                                 "features": fraud.FEATURES})
-    summary["fraud"] = {"version": v, "promoted": reg.promote("fraud", v, GATES["fraud"]), **m}
-    scores = fraud.score(model, F)
-    conn.executemany("UPDATE orders SET risk_score=? WHERE order_id=?",
-                     [(round(float(s), 4), oid) for s, oid in zip(scores, F.index)])
-    conn.commit()
+    # 2) recommender ------------------------------------------------------------------------
+    if n_orders >= recommender.MIN_ORDERS_TO_EVALUATE:
+        best_w, m, grid = recommender.tune(P, O, I)  # temporal split on real orders, gated vs popularity
+        rec = recommender.HybridRecommender(**best_w).fit(P, live, I)
+        v = reg.log_model("recommender", rec, {**m, "mode": "trained", "orders": n_orders},
+                          params={**rec.w, "grid": grid})
+        promoted = reg.promote("recommender", v, GATES["recommender"])
+    else:  # cold start: product similarity + category complements + Amazon review volume
+        rec = recommender.HybridRecommender().fit(P, live, I)
+        m = {"mode": "cold_start", "orders": n_orders, "needs_orders": recommender.MIN_ORDERS_TO_EVALUATE}
+        v = reg.log_model("recommender", rec, m, params=rec.w)
+        promoted = reg.promote("recommender", v)
+    summary["recommender"] = {"version": v, "promoted": promoted, **m}
 
-    # 4) revenue forecast -------------------------------------------------------------------
-    r = forecast.fit_forecast(forecast.daily_series(O))
-    v = reg.log_model("forecast", {"model": r["model"], "t0": r["t0"]}, r["metrics"])
-    summary["forecast"] = {"version": v, "promoted": reg.promote("forecast", v, GATES["forecast"]), **r["metrics"]}
-    (settings.artifacts_dir / "forecast.json").write_text(json.dumps(r["forecast"], indent=2))
+    # 3) fraud / order risk -------------------------------------------------------------------
+    if n_orders >= fraud.MIN_ORDERS_TO_TRAIN:
+        F = fraud.build_features(O, I, C, P)
+        model, m = fraud.train(F)
+        v = reg.log_model("fraud", model, {**m, "mode": "trained"},
+                          params={"model": "IsolationForest", "contamination": 0.01, "features": fraud.FEATURES})
+        summary["fraud"] = {"version": v, "promoted": reg.promote("fraud", v, GATES["fraud"]), **m}
+    else:
+        summary["fraud"] = {"mode": "rules", "orders": n_orders, "needs_orders": fraud.MIN_ORDERS_TO_TRAIN,
+                            "note": "orders are scored at checkout with transparent rules until enough history"}
+
+    # 4) revenue forecast ----------------------------------------------------------------------
+    series = forecast.daily_series(O) if n_orders else None
+    days = 0 if series is None else len(series)
+    fc_path = settings.artifacts_dir / "forecast.json"
+    if days >= forecast.MIN_DAYS:
+        r = forecast.fit_forecast(series)
+        v = reg.log_model("forecast", {"model": r["model"], "t0": r["t0"]}, r["metrics"])
+        summary["forecast"] = {"version": v, "promoted": reg.promote("forecast", v, GATES["forecast"]),
+                               **r["metrics"]}
+        fc_path.write_text(json.dumps(r["forecast"], indent=2))
+    else:
+        summary["forecast"] = {"mode": "waiting_for_data", "days_of_sales": days, "needs_days": forecast.MIN_DAYS}
+        fc_path.unlink(missing_ok=True)
 
     (settings.artifacts_dir / "training_summary.json").write_text(json.dumps(summary, indent=2, default=str))
     print(json.dumps(summary, indent=2, default=str))

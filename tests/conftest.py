@@ -1,7 +1,8 @@
 """Build one isolated dataset per test session from the Hugging Face catalog.
 
 The catalog is streamed from Hugging Face on first run and cached at .cache/catalog_hf.jsonl (gitignored, cached in
-CI), so later runs need no network. Embeddings are local (hashing) and the agent is the rule agent, so no keys.
+CI), so later runs need no network. Embeddings are local (hashing) and the assistant is
+Foundry-only, so it reports itself unavailable here - no keys and no fake replies.
 """
 import os
 import subprocess
@@ -14,8 +15,9 @@ _tmp = tempfile.mkdtemp(prefix="techcart-test-")
 os.environ["TECHCART_DATA_DIR"] = _tmp
 os.environ["AZURE_OPENAI_ENDPOINT"] = ""      # keep tests free of LLM calls
 os.environ["AZURE_OPENAI_API_KEY"] = ""
-os.environ["AGENT_MODE"] = "rules"
-os.environ["SIMULATE"] = "0"
+os.environ["ADMIN_EMAILS"] = "admin@techcart.example"
+os.environ["ENTRA_CLIENT_ID"] = ""
+os.environ["ENTRA_CLIENT_SECRET"] = ""
 
 import pytest  # noqa: E402
 
@@ -29,8 +31,13 @@ def dataset():
         if r.returncode:
             pytest.exit(f"{a[0]} failed (Hugging Face reachable?):\n{r.stderr[-2000:]}", returncode=1)
 
-    run("scripts/seed.py", "--per-category", "40", "--days", "240", "--customers", "1500", "--orders-per-day", "25")
+    run("scripts/seed.py", "--per-category", "40")
     run("scripts/train_all.py")
     run("scripts/build_index.py", "--embedder", "hashing")
-    run("scripts/simulate_traffic.py")
-    yield Path(_tmp)
+    import sqlite3
+    con = sqlite3.connect(Path(_tmp) / "techcart.db")
+    tables = ("products", "suppliers", "customers", "orders", "receipts", "quotations", "purchase_orders",
+              "search_log", "chat_log")
+    counts = {t: con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in tables}
+    con.close()
+    yield {"dir": Path(_tmp), "seed_counts": counts}

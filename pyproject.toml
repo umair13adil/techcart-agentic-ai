@@ -31,12 +31,14 @@ dependencies = [
   # catalog: streamed from Hugging Face (Amazon-Reviews-2023, raw_meta_Electronics parquet)
   "datasets>=3.0",
   "huggingface_hub>=0.23",
+  # Microsoft Entra ID sign-in
+  "msal>=1.28",
 ]
 
 [project.optional-dependencies]
 mlops = ["mlflow>=2.14"]
 azure = ["azure-search-documents>=11.4", "azure-identity>=1.16"]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "httpx>=0.27"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

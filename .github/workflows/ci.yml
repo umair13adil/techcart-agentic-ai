@@ -46,11 +46,11 @@ jobs:
       - uses: actions/cache@v4
         with: {path: .cache, key: hf-catalog-v1}
       # In production the data comes from the warehouse; here we regenerate the demo dataset.
-      - run: python scripts/seed.py && python scripts/simulate_traffic.py || true
+      - run: python scripts/seed.py || true
       - name: Drift check (exit 3 => retrain)
         id: drift
         run: |
-          set +e; python scripts/train_all.py >/dev/null; python scripts/simulate_traffic.py
+          set +e; python scripts/train_all.py >/dev/null
           python scripts/monitor_drift.py; echo "code=$?" >> "$GITHUB_OUTPUT"
       - name: Retrain with promotion gates
         if: steps.drift.outputs.code == '3'

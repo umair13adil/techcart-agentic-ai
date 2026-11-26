@@ -41,7 +41,7 @@ def recommend_for_customer(customer_id: str | None, session_id: str | None = Non
     out = []
     for r in recs:
         card = services.product_card(services.product(r["product_id"]), stock)
-        card["reason"] = r.get("reason", "Trending this month")
+        card["reason"] = r.get("reason", "Popular on Amazon")
         out.append(card)
     return out
 

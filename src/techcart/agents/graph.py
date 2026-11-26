@@ -152,7 +152,8 @@ def build_graph(hub: MCPHub):
 
     async def router(state: AgentState) -> dict:
         u = understander().understand(str(state["messages"][-1].content))
-        services.log_search(state["session_id"], u.query, u.intent, u.confidence, u.tier == "llm")
+        services.log_search(state["session_id"], u.query, u.intent, u.confidence, u.tier == "llm", source="chat",
+                            customer_id=state.get("customer_id"), entities=u.entities)
         return {"route": ROUTES.get(u.intent, "support"), "understanding": u.dict(), "checkout_request": None,
                 "ui": {}}
 
@@ -163,7 +164,10 @@ def build_graph(hub: MCPHub):
             toolset = [available[n] for n in TOOLSETS[name] if n in available]
             llm = chat_model().bind_tools(toolset)
             u = state.get("understanding", {})
-            sys = SystemMessage(PROMPTS[name].format(customer_id=state.get("customer_id") or "guest") +
+            cust = services.customer(state["customer_id"]) if state.get("customer_id") else None
+            who = (f"{state['customer_id']} ({cust['name']}, delivery city: {cust.get('city') or 'not set - ask'})"
+                   if cust else "not signed in (browsing is fine; checkout and quotes need Microsoft sign-in)")
+            sys = SystemMessage(PROMPTS[name].format(customer_id=who) +
                                 f"\nParsed request (classifier): intent={u.get('intent')} entities="
                                 f"{json.dumps({k: v for k, v in (u.get('entities') or {}).items() if v})}")
             history = [m for m in state["messages"][-12:]]
@@ -186,7 +190,11 @@ def build_graph(hub: MCPHub):
 
     async def prepare(state: AgentState) -> dict:
         req = state["checkout_request"]
-        cid = state.get("customer_id") or "GUEST"
+        cid = state.get("customer_id")
+        if not cid:  # orders belong to real, signed-in customers only
+            return {"checkout_summary": None,
+                    "messages": [AIMessage("Please sign in with your Microsoft account (top right) to check out. "
+                                           "Your cart will be kept.")]}
         summary = await checkout.prepare(hub, state["session_id"], cid, req["payment_method"], req["city"],
                                          req.get("express", False))
         if summary["status"] != "awaiting_confirmation":
