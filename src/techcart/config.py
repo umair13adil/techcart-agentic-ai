@@ -17,6 +17,8 @@ def _load_dotenv(path: Path) -> None:
             continue
         k, v = line.split("=", 1)
         v = v.split(" #")[0].strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":  # KEY="value" / KEY='value'
+            v = v[1:-1]
         os.environ.setdefault(k.strip(), v)
 
 

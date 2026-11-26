@@ -27,9 +27,28 @@ def chat_model(temperature: float = 0.0):
 
 
 @lru_cache(maxsize=1)
+def check_endpoint() -> None:
+    """Fail fast with a readable message when the Azure endpoint can't be reached (typo, placeholder, quotes)."""
+    import socket
+    from urllib.parse import urlparse
+
+    url = settings.aoai_endpoint
+    host = urlparse(url).hostname
+    if not url.startswith("https://") or not host or "<" in url:
+        raise LLMUnavailable(f"AZURE_OPENAI_ENDPOINT looks wrong: {url!r}. Expected "
+                             "https://<resource>.openai.azure.com/ or https://<resource>.cognitiveservices.azure.com/")
+    try:
+        socket.getaddrinfo(host, 443)
+    except OSError as e:
+        raise LLMUnavailable(f"Cannot resolve {host!r} ({e}). Check the resource name in AZURE_OPENAI_ENDPOINT "
+                             "(Azure portal -> your Azure OpenAI / Foundry resource -> Keys and Endpoint), "
+                             "and your internet/VPN/DNS.") from None
+
+
 def embeddings_client():
     if not settings.llm_enabled:
         raise LLMUnavailable("Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY")
+    check_endpoint()
     from openai import AzureOpenAI
 
     return AzureOpenAI(azure_endpoint=settings.aoai_endpoint, api_key=settings.aoai_key,

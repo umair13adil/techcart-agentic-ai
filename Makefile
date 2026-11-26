@@ -18,7 +18,7 @@ train:              ## train + evaluate + register + gated promotion
 	$(PY) scripts/train_all.py
 
 index:              ## chunk + embed docs (Azure OpenAI if configured, else local hashing)
-	$(PY) scripts/build_index.py
+	$(PY) scripts/build_index.py $(ARGS)
 
 eval:               ## RAG retrieval eval (+ LangSmith LLM-judge with: make eval ARGS=--langsmith)
 	$(PY) scripts/eval_rag.py $(ARGS)
